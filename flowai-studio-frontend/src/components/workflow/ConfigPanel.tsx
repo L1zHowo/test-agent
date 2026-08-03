@@ -9,50 +9,12 @@ const { Text } = Typography
 const MODEL_GROUPS = [
   {
     provider: 'qwen',
-    label: '🇨🇳 通义千问 (Qwen)',
+    label: '通义千问 (Qwen)',
     models: [
       { id: 'qwen-turbo', name: 'Qwen Turbo', tag: '快速', tagColor: 'green' },
       { id: 'qwen-plus', name: 'Qwen Plus', tag: '高质量', tagColor: 'blue' },
       { id: 'qwen-max', name: 'Qwen Max', tag: '最强', tagColor: 'purple' },
       { id: 'qwen-long', name: 'Qwen Long', tag: '长文本', tagColor: 'orange' },
-    ],
-  },
-  {
-    provider: 'openai',
-    label: '🌐 OpenAI',
-    models: [
-      { id: 'gpt-4o', name: 'GPT-4o', tag: '推荐', tagColor: 'gold' },
-      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', tag: '性价比', tagColor: 'green' },
-      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', tag: '强大', tagColor: 'purple' },
-      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', tag: '经济', tagColor: 'default' },
-    ],
-  },
-  {
-    provider: 'claude',
-    label: '🤖 Anthropic Claude',
-    models: [
-      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', tag: '推荐', tagColor: 'gold' },
-      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', tag: '最强', tagColor: 'purple' },
-      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', tag: '快速', tagColor: 'green' },
-    ],
-  },
-  {
-    provider: 'gemini',
-    label: '✨ Google Gemini',
-    models: [
-      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', tag: '100万上下文', tagColor: 'blue' },
-      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', tag: '快速', tagColor: 'green' },
-      { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro', tag: '稳定', tagColor: 'default' },
-    ],
-  },
-  {
-    provider: 'ollama',
-    label: '🏠 Ollama (本地)',
-    models: [
-      { id: 'qwen2.5:7b', name: 'Qwen2.5 7B', tag: '本地', tagColor: 'cyan' },
-      { id: 'llama3.1:8b', name: 'Llama 3.1 8B', tag: '本地', tagColor: 'cyan' },
-      { id: 'mistral:7b', name: 'Mistral 7B', tag: '本地', tagColor: 'cyan' },
-      { id: 'deepseek-coder-v2:16b', name: 'DeepSeek Coder V2 16B', tag: '本地', tagColor: 'cyan' },
     ],
   },
 ]

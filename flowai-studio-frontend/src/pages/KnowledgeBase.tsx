@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, Table, message, Modal, Upload, Space, Typography, Empty, Spin, Select, Slider, InputNumber, Divider, Tag, Tooltip, Collapse, Switch } from 'antd'
+import { Button, Input, Table, message, Modal, Upload, Space, Typography, Empty, Spin, Select, Slider, InputNumber, Divider, Tag, Tooltip, Collapse } from 'antd'
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -19,7 +19,7 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../store'
-import { DocumentChunk, EmbeddingProviderType, VectorStoreType, RerankerProviderType, EMBEDDING_MODELS, VECTOR_STORE_OPTIONS, RETRIEVAL_MODE_OPTIONS, RERANKER_PROVIDER_OPTIONS, COHERE_RERANK_MODELS, OLLAMA_RERANK_MODELS } from '../types'
+import { DocumentChunk, EmbeddingProviderType, VectorStoreType, RETRIEVAL_MODE_OPTIONS } from '../types'
 import './KnowledgeBase.css'
 
 const { Text } = Typography
@@ -57,11 +57,6 @@ const KnowledgeBase: React.FC = () => {
     retrievalMode: 'vector' as 'vector' | 'keyword' | 'hybrid',
     vectorWeight: 0.7,
     rrfK: 60,
-    // Phase 2.3: Reranker 配置
-    rerankerEnabled: false,
-    rerankerProvider: 'none' as RerankerProviderType,
-    rerankerModel: '',
-    rerankerTopN: 5,
   })
   const [documents, setDocuments] = useState<any[]>([])
   const [chunkModalVisible, setChunkModalVisible] = useState(false)
@@ -77,8 +72,6 @@ const KnowledgeBase: React.FC = () => {
     [safeKnowledgeBases],
   )
 
-  // Embedding 模型配置来自 types/index.ts 中的 EMBEDDING_MODELS 常量
-
   const handleAddKb = () => {
     setEditingKb(null)
     setFormData({
@@ -89,7 +82,6 @@ const KnowledgeBase: React.FC = () => {
       retrievalMode: 'vector' as 'vector' | 'keyword' | 'hybrid',
       vectorWeight: 0.7,
       rrfK: 60,
-      rerankerEnabled: false, rerankerProvider: 'none', rerankerModel: '', rerankerTopN: 5,
     })
     setModalVisible(true)
   }
@@ -101,16 +93,12 @@ const KnowledgeBase: React.FC = () => {
       embeddingProvider: kb.embeddingProvider || 'qwen',
       embeddingModel: kb.embeddingModel || 'text-embedding-v3',
       embeddingDimension: kb.embeddingDimension || 1024,
-      vectorStore: kb.vectorStore || 'pgvector',
+      vectorStore: 'pgvector',
       chunkSize: kb.chunkSize || 500, chunkOverlap: kb.chunkOverlap || 50,
       topK: kb.topK || 5, similarityThreshold: kb.similarityThreshold || 0.7,
       retrievalMode: kb.retrievalMode || 'vector',
       vectorWeight: kb.vectorWeight ?? 0.7,
       rrfK: kb.rrfK ?? 60,
-      rerankerEnabled: kb.rerankerEnabled ?? false,
-      rerankerProvider: kb.rerankerProvider || 'none',
-      rerankerModel: kb.rerankerModel || '',
-      rerankerTopN: kb.rerankerTopN ?? 5,
     })
     setModalVisible(true)
   }
@@ -190,27 +178,14 @@ const KnowledgeBase: React.FC = () => {
     {
       title: '向量配置', key: 'vectorConfig', width: 160,
       render: (_: any, record: any) => {
-        const providerLabels: Record<string, string> = { qwen: 'Qwen', openai: 'OpenAI', ollama: 'Ollama' }
-        const storeLabels: Record<string, string> = { pgvector: 'pgvector', qdrant: 'Qdrant', milvus: 'Milvus' }
+        const providerLabels: Record<string, string> = { qwen: 'Qwen' }
         const provider = record.embeddingProvider || 'qwen'
-        const store = record.vectorStore || 'pgvector'
         return (
           <Space size={4}>
             <Tag color="blue" style={{ fontSize: 11, margin: 0 }}>{providerLabels[provider] || provider}</Tag>
-            <Tag color="green" style={{ fontSize: 11, margin: 0 }}>{storeLabels[store] || store}</Tag>
+            <Tag color="green" style={{ fontSize: 11, margin: 0 }}>pgvector</Tag>
           </Space>
         )
-      },
-    },
-    {
-      title: '重排序', key: 'reranker', width: 90,
-      render: (_: any, record: any) => {
-        if (!record.rerankerEnabled || record.rerankerProvider === 'none') {
-          return <Tag style={{ fontSize: 11, margin: 0, color: '#8c8c8c' }}>关闭</Tag>
-        }
-        const rerankerLabels: Record<string, string> = { cohere: 'Cohere', ollama: 'Ollama' }
-        const color = record.rerankerProvider === 'cohere' ? 'blue' : 'green'
-        return <Tag color={color} style={{ fontSize: 11, margin: 0 }}>{rerankerLabels[record.rerankerProvider] || record.rerankerProvider}</Tag>
       },
     },
     {
@@ -286,31 +261,11 @@ const KnowledgeBase: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="kb-field">
               <label className="kb-field-label"><RobotOutlined /> Embedding 服务</label>
-              <Select value={formData.embeddingProvider} onChange={(val: EmbeddingProviderType) => {
-                const models = EMBEDDING_MODELS[val]
-                const defaultModel = models[0]
-                setFormData({
-                  ...formData,
-                  embeddingProvider: val,
-                  embeddingModel: defaultModel.value,
-                  embeddingDimension: defaultModel.dimension,
-                })
-              }} style={{ width: '100%' }}
-                options={[
-                  { label: '通义千问 (Qwen)', value: 'qwen' },
-                  { label: 'OpenAI', value: 'openai' },
-                  { label: 'Ollama (本地)', value: 'ollama' },
-                ]}
-              />
+              <Input value="通义千问 (Qwen)" disabled />
             </div>
             <div className="kb-field">
               <label className="kb-field-label"><CloudServerOutlined /> 向量存储</label>
-              <Select value={formData.vectorStore} onChange={(val: VectorStoreType) => setFormData({ ...formData, vectorStore: val })} style={{ width: '100%' }}
-                options={VECTOR_STORE_OPTIONS.map((opt) => ({
-                  label: <Tooltip title={opt.description}><span>{opt.label}</span></Tooltip>,
-                  value: opt.value,
-                }))}
-              />
+              <Input value="PostgreSQL + pgvector" disabled />
             </div>
             <div className="kb-field">
               <label className="kb-field-label"><SearchOutlined /> 检索模式</label>
@@ -323,22 +278,11 @@ const KnowledgeBase: React.FC = () => {
             </div>
             <div className="kb-field">
               <label className="kb-field-label">Embedding 模型</label>
-              <Select value={formData.embeddingModel} onChange={(val) => {
-                const models = EMBEDDING_MODELS[formData.embeddingProvider]
-                const selected = models.find((m) => m.value === val)
-                setFormData({ ...formData, embeddingModel: val, embeddingDimension: selected?.dimension || 1024 })
-              }} style={{ width: '100%' }}
-                options={EMBEDDING_MODELS[formData.embeddingProvider].map((m) => ({
-                  label: m.label,
-                  value: m.value,
-                }))}
-              />
+              <Input value="text-embedding-v3" disabled />
             </div>
             <div className="kb-field">
               <label className="kb-field-label">向量维度</label>
-              <Select value={formData.embeddingDimension} onChange={(val) => setFormData({ ...formData, embeddingDimension: val })} style={{ width: '100%' }}
-                options={[formData.embeddingDimension].map((d) => ({ label: `${d}`, value: d }))}
-              />
+              <Input value="1024" disabled />
             </div>
             <div className="kb-field">
               <label className="kb-field-label">TopK</label>
@@ -380,57 +324,6 @@ const KnowledgeBase: React.FC = () => {
                     </Tooltip>
                   </label>
                   <Slider value={formData.rrfK} onChange={(val) => setFormData({ ...formData, rrfK: val })} min={1} max={200} step={1} marks={{ 1: '1', 60: '60', 100: '100', 200: '200' }} />
-                </div>
-              </>
-            )}
-            {/* Phase 2.3: Reranker 配置 */}
-            <div className="kb-field" style={{ gridColumn: '1 / -1' }}>
-              <Divider orientation="left" style={{ fontSize: 12, color: 'var(--c-text-secondary)', margin: '8px 0' }}>
-                <ExperimentOutlined /> 重排序配置 (Reranker)
-              </Divider>
-            </div>
-            <div className="kb-field">
-              <label className="kb-field-label">
-                <Switch
-                  size="small"
-                  checked={formData.rerankerEnabled}
-                  onChange={(checked) => setFormData({ ...formData, rerankerEnabled: checked, rerankerProvider: checked ? 'cohere' : 'none' })}
-                />
-                <span style={{ marginLeft: 8 }}>启用重排序</span>
-                <Tooltip title="检索后对候选文档重排序，提高 Top-K 精度。推荐混合检索 + Reranker 组合使用。">
-                  <InfoCircleOutlined style={{ marginLeft: 4, fontSize: 12, color: 'var(--c-text-tertiary)' }} />
-                </Tooltip>
-              </label>
-            </div>
-            {formData.rerankerEnabled && (
-              <>
-                <div className="kb-field">
-                  <label className="kb-field-label">Reranker 服务</label>
-                  <Select value={formData.rerankerProvider} onChange={(val: RerankerProviderType) => {
-                    const defaultModels: Record<string, string> = { cohere: 'rerank-v3.5', ollama: 'bge-reranker-v2-m3', none: '' }
-                    setFormData({ ...formData, rerankerProvider: val, rerankerModel: defaultModels[val] || '' })
-                  }} style={{ width: '100%' }}
-                    options={RERANKER_PROVIDER_OPTIONS.map((opt) => ({
-                      label: <Tooltip title={opt.description}><span style={{ color: opt.color }}>{opt.label}</span></Tooltip>,
-                      value: opt.value,
-                    }))}
-                  />
-                </div>
-                <div className="kb-field">
-                  <label className="kb-field-label">Reranker 模型</label>
-                  <Select value={formData.rerankerModel || undefined} onChange={(val) => setFormData({ ...formData, rerankerModel: val })} style={{ width: '100%' }}
-                    options={(formData.rerankerProvider === 'cohere' ? COHERE_RERANK_MODELS : OLLAMA_RERANK_MODELS).map((m) => ({ label: m.label, value: m.value }))}
-                    placeholder="选择模型"
-                  />
-                </div>
-                <div className="kb-field">
-                  <label className="kb-field-label">
-                    重排序 TopN: {formData.rerankerTopN}
-                    <Tooltip title="重排序后返回的文档数量，建议与 TopK 一致或更小以减少 LLM 上下文长度。">
-                      <InfoCircleOutlined style={{ marginLeft: 4, fontSize: 12, color: 'var(--c-text-tertiary)' }} />
-                    </Tooltip>
-                  </label>
-                  <Slider value={formData.rerankerTopN} onChange={(val) => setFormData({ ...formData, rerankerTopN: val })} min={1} max={20} step={1} marks={{ 1: '1', 5: '5', 10: '10', 20: '20' }} />
                 </div>
               </>
             )}

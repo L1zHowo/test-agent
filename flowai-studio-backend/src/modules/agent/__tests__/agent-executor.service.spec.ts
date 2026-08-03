@@ -376,16 +376,16 @@ describe('AgentExecutorService', () => {
 
   describe('Multi-Model Routing', () => {
     it('should route to correct provider based on model ID', async () => {
-      const openaiProvider = {
+      const qwenProvider = {
         ...mockProvider,
-        name: 'openai',
+        name: 'qwen',
         chat: jest.fn().mockResolvedValue({
           content: 'GPT-4o 回答',
           toolCalls: undefined,
         }),
       };
 
-      mockProviderFactory.getProviderForModel.mockReturnValue(openaiProvider);
+      mockProviderFactory.getProviderForModel.mockReturnValue(qwenProvider);
 
       const config: AgentNodeConfig = {
         mode: 'single',
@@ -398,7 +398,7 @@ describe('AgentExecutorService', () => {
           name: 'GPT 助手',
           description: '',
           systemPrompt: '',
-          model: 'gpt-4o',
+          model: 'qwen-plus',
           temperature: 0.7,
           maxTokens: 2048,
           toolIds: [],
@@ -409,8 +409,8 @@ describe('AgentExecutorService', () => {
 
       const result = await agentExecutor.execute(config, '你好');
 
-      expect(mockProviderFactory.getProviderForModel).toHaveBeenCalledWith('gpt-4o');
-      expect(openaiProvider.chat).toHaveBeenCalled();
+      expect(mockProviderFactory.getProviderForModel).toHaveBeenCalledWith('qwen-plus');
+      expect(qwenProvider.chat).toHaveBeenCalled();
       expect(result.success).toBe(true);
     });
   });

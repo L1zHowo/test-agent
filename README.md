@@ -1,143 +1,230 @@
 # FlowAI Studio
 
-FlowAI Studio 是一个先进的全栈可视化 AI 应用低代码编排平台。它旨在降低 AI 应用开发的门槛，使开发者和业务人员能够通过直观的拖拽式交互，快速构建、测试和部署复杂的 AI 工作流。
+FlowAI Studio 是一个可视化 AI 应用与工作流编排平台，包含前端画布、后端执行器、RAG 知识库、Agent、工具、MCP 和团队协作能力，适合搭建带有大模型、知识检索与工具调用的 AI 应用。
 
-## 项目亮点
+> 当前仓库更适合作为开发和学习项目。运行时需要 Qwen 模型服务、PostgreSQL + pgvector 和 Redis；生产部署前还需要补充安全、运维和端到端测试。
 
-### 1. 深度可视化的工作流编排
-- 交互式编辑器：基于 React Flow 构建，支持节点的自由拖拽与缩放。
-- 丰富的节点类型：
-    - 开始节点：定义流程入口。
-    - 用户输入节点：收集用户输入。
-    - LLM 节点：支持自定义 Prompt、模型选择及参数配置（温度、Max Tokens 等）。
-    - RAG 检索节点：无缝集成知识库，实现检索增强生成。
-    - 条件分支节点：支持逻辑判断，实现复杂的决策流。
-    - 技能/工具节点：调用外部 API 或内置功能。
-    - 输出节点：定义流程的最终输出。
-- 实时状态同步：画布操作与全局状态管理（Zustand）高度同步，确保编排过程的数据一致性。
+## 已实现能力
 
-### 2. 强大的 RAG 知识库管理
-- 全生命周期管理：支持文档上传、切片、向量化存储及检索。
-- 多格式支持：能够处理多种常见的文档格式，为 AI 提供精准的上下文支撑。
-- 调试工具：内置检索测试功能，可在编排前验证知识库的召回效果。
+### 应用与工作流
 
-### 3. 灵活的插件与工具系统
-- MCP 协议集成：遵循 Model Context Protocol，通过 stdio + JSON-RPC 2.0 协议，支持动态连接、断开外部 MCP Server，自动发现并调用其提供的工具。
-- 内置工具库：提供时间查询、HTTP 请求、JSON 处理、正则匹配、计算器、代码执行（JS 沙箱）等常用工具。
-- 自定义技能：支持开发者定义自己的工具接口（配置 API 地址、HTTP 方法、请求头），并将其作为节点在工作流中使用。
+- 创建、编辑、发布、取消发布、归档和恢复应用。
+- 使用 React Flow 拖拽编排工作流。
+- 支持开始、用户输入、LLM、Agent、RAG、工具、条件分支和输出节点。
+- 支持普通执行和 SSE 流式执行。
+- 执行器包含超时、重试、心跳、取消运行和错误处理。
+- 支持工作流版本比较与回滚、DSL 导入导出与校验、工作流模板。
 
-### 4. 企业级后端架构
-- 模块化设计：后端基于 NestJS，采用严格的模块化开发模式，业务逻辑清晰，易于扩展。
-- 稳健的数据层：使用 Prisma ORM 配合 SQLite，支持复杂的关联查询与事务处理。
-- 统一的 API 规范：内置全局异常过滤器、响应拦截器及入参校验管道（class-validator），确保接口调用的安全性与一致性。
+### 大模型与 Agent
 
-### 5. 生产就绪的应用管理
-- 应用状态控制：支持草稿、已发布、已归档等多种应用状态，并提供归档/取消归档操作。
-- 用户认证体系：基于 JWT 的认证与授权，保护用户的私有数据与工作流资产。
-- 响应式 UI：适配不同尺寸的屏幕，提供流畅的桌面端操作体验。
+- LLM 统一使用通义千问 Qwen。
+- 可查询 Qwen 模型和服务健康状态，并估算 Token 成本。
+- Agent 支持单 Agent ReAct 和 Supervisor/Worker 多智能体模式。
+- Agent 可以组合知识库和工具完成任务。
+- 调试中心提供流式对话、会话历史和可选的 RAG 上下文。
+
+调试中心、LLM 节点和 Agent 都使用 Qwen，需要配置有效的 `QWEN_API_KEY`。
+
+### RAG 知识库
+
+- 按用户创建和管理知识库。
+- 支持 `txt`、`md`、`json`、`csv`、`log`、`yaml`、`pdf` 和 `docx`。
+- 文档会进行解析、分块、Embedding 和向量写入。
+- 支持向量、关键词和混合检索，混合检索使用 RRF 融合。
+- Embedding 固定使用 Qwen `text-embedding-v3`。
+- 向量存储固定使用 PostgreSQL 的 pgvector 扩展。
+- 使用内存与 Redis 两级缓存。
+
+Prisma Schema 的向量列固定为 `vector(1024)`，与 Qwen `text-embedding-v3` 的当前配置一致。
+
+### 工具、MCP 与协作
+
+- 内置时间、HTTP、JSON、正则、计算器和 JavaScript 沙箱工具。
+- 支持创建自定义 HTTP 工具。
+- 支持通过 stdio + JSON-RPC 2.0 管理和调用 MCP Server。
+- 支持注册登录、JWT、数据按用户隔离、角色和团队权限。
+- 支持团队、成员、团队应用、公开分享、嵌入配置和 API Key。
+- 支持 Token/费用统计、工作流 Trace、节点 Span、慢调用和健康检查。
+
+MCP Server 由后端作为子进程运行。使用 Docker 时，对应命令和依赖也必须存在于后端容器中。
 
 ## 技术栈
 
-### 前端 (Frontend)
-- 核心框架: React 18 (Vite)
-- 状态管理: Zustand
-- UI 组件库: Ant Design (AntD)
-- 流程图引擎: React Flow (@xyflow/react)
-- 样式处理: CSS + Ant Design Token
-- 路由管理: React Router v6
+| 部分 | 技术 |
+| --- | --- |
+| 前端 | React 18、TypeScript、Vite、Ant Design、React Flow、Zustand |
+| 后端 | NestJS、TypeScript、Prisma、JWT、class-validator、SSE |
+| 数据库 | PostgreSQL 16 + pgvector |
+| 缓存 | Redis 7 |
+| 文档处理 | pdf-parse、mammoth |
+| 部署 | Docker Compose、Nginx |
 
-### 后端 (Backend)
-- 核心框架: NestJS
-- 数据库层: Prisma ORM + SQLite
-- 认证安全: JWT (JSON Web Token)
-- 校验工具: class-validator + class-transformer
-- 异步通信: Axios / Server-Sent Events (SSE)
-- 代码沙箱: vm2
+仓库有两个独立 Node.js 工程，但没有根级 Workspace 配置，因此是同仓库多项目结构，不是 npm/pnpm Workspace 意义上的 Monorepo。
 
-## 快速开始
-
-### 1. 环境准备
-确保您的开发环境已安装以下软件：
-- Node.js (v18.0.0 或更高版本)
-- npm (v9.0.0 或更高版本)
-
-### 2. 后端配置与启动
-```bash
-cd flowai-studio-backend
-# 安装项目依赖
-npm install
-# 配置环境变量 (参考 .env.example)
-cp .env.example .env
-# 同步数据库结构
-npx prisma db push
-# 写入默认演示数据（默认账号、默认知识库、默认文档）
-npx prisma db seed
-# 启动后端开发服务器
-npm run start:dev
-```
-*注意：请务必在 .env 文件中填入有效的 QWEN_API_KEY 以启用 AI 节点功能。*
-
-### 3. 前端配置与启动
-```bash
-cd flowai-studio-frontend
-# 安装项目依赖
-npm install
-# 启动前端开发服务器
-npm run dev
-```
-启动完成后，在浏览器中访问 http://localhost:5173 即可开始您的 AI 编排之旅。
-
-## 默认账号（演示用）
-- 用户名：admin
-- 密码：admin123
-
-## 如何验证 RAG（最短路径）
-1. 使用默认账号登录。
-2. 打开「知识库管理」，确认存在「默认知识库」，并且里面有文档「FlowAI Studio 功能介绍.md」。
-3. 打开「调试中心」→「AI 聊天」，在"关联知识库"下拉框中选择「默认知识库」。
-4. 发送问题：`FlowAI Studio 有什么核心特性？`
-5. 观察返回结果下方的「参考文档」区域，应该能看到命中的文档片段与相似度。
-
-## 验证 RAG（接口方式，可选）
-```bash
-# 1) 登录获取 token
-curl -s -X POST http://localhost:3000/api/users/login \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"admin123"}'
-
-# 2) 带 token 获取知识库列表（将 YOUR_TOKEN 替换成上一步返回的 token）
-curl -s http://localhost:3000/api/rag/knowledge-bases \
-  -H "Authorization: Bearer YOUR_TOKEN"
-
-# 3) 检索（将 KB_ID 替换成知识库 id）
-curl -s -X POST http://localhost:3000/api/rag/retrieve \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{"query":"FlowAI Studio 有什么核心特性","knowledgeBaseId":"KB_ID","topK":3}'
-```
-
-## 项目结构说明
+## 项目结构
 
 ```text
-├── flowai-studio-frontend   # 前端工程
-│   ├── src/components       # 通用组件及工作流节点组件
-│   ├── src/pages            # 业务页面视图
-│   ├── src/store            # 全局状态管理切片
-│   ├── src/router           # 路由导航配置
-│   └── src/types            # TypeScript 类型定义
-└── flowai-studio-backend    # 后端工程
-    ├── src/modules          # 业务逻辑模块 (AI, App, Workflow, RAG, Skill, MCP, User)
-    ├── src/common           # 公共中间件、装饰器、拦截器
-    ├── src/config           # 环境变量与全局配置
-    └── prisma               # 数据库 Schema 定义与 Seed 脚本
+.
+|-- docker-compose.yml
+|-- scripts/init-pgvector.sql
+|-- flowai-studio-backend/
+|   |-- prisma/              # Schema、迁移和 Seed
+|   `-- src/                 # User、App、Workflow、Agent、RAG、Skill、MCP、Team
+`-- flowai-studio-frontend/
+    `-- src/                 # 页面、组件、路由、状态和 API 封装
 ```
 
-## 开源协议
-小圆项目，禁止商业用途。
-<img width="1612" height="961" alt="image" src="https://github.com/user-attachments/assets/c58798f9-96f5-4415-968a-70e99a96e595" />
-<img width="1612" height="961" alt="image" src="https://github.com/user-attachments/assets/bb0d912c-44a1-48ef-a25c-fb4a7560b1d8" />
-<img width="1612" height="961" alt="image" src="https://github.com/user-attachments/assets/85ba1bc0-f2a7-4981-9a98-af057cf949f6" />
-<img width="1612" height="961" alt="image" src="https://github.com/user-attachments/assets/a40c8ba6-ac10-4fb9-890f-b0a5758e4a37" />
-<img width="1612" height="961" alt="image" src="https://github.com/user-attachments/assets/d457aff7-cfa4-4f81-aac8-f5496c36994f" />
-<img width="1612" height="961" alt="image" src="https://github.com/user-attachments/assets/c10a3711-c73a-4ca9-af23-28f9bf225a3b" />
-<img width="1612" height="961" alt="image" src="https://github.com/user-attachments/assets/dcc9bf67-52e3-4420-84d3-9f1693c38cf0" />
+## 环境要求
+
+- Node.js 20 推荐，至少 Node.js 18。
+- npm 9 或更高版本。
+- PostgreSQL，并启用 pgvector。
+- Redis。
+- 至少一个可用的大模型和 Embedding 服务。
+
+## 后端环境变量
+
+仓库当前没有 `.env.example`。请配置 `flowai-studio-backend/.env`：
+
+```dotenv
+PORT=3000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
+
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/flowai_studio?schema=public
+REDIS_URL=redis://localhost:6379
+
+JWT_SECRET=请替换为足够长且随机的字符串
+JWT_EXPIRES_IN=7d
+
+QWEN_API_KEY=你的通义千问_API_Key
+QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_EMBEDDING_API_KEY=你的通义千问_API_Key
+QWEN_EMBEDDING_MODEL=text-embedding-v3
+QWEN_EMBEDDING_DIMENSION=1024
+
+UPLOAD_PATH=./uploads
+MAX_FILE_SIZE=10485760
+```
+
+不要提交真实的 `.env`、JWT Secret 或 API Key。根目录 `.gitignore` 已忽略所有 `.env` 文件。
+
+
+## 本地开发启动
+
+推荐用 Docker 运行 PostgreSQL 和 Redis，在本机运行前后端。
+
+### 1. 启动 PostgreSQL 与 Redis
+
+```powershell
+docker compose up -d postgres redis
+```
+
+首次创建数据库时会执行 `scripts/init-pgvector.sql`。如果旧数据库卷中没有扩展：
+
+```powershell
+docker exec -it flowai-postgres psql -U postgres -d flowai_studio -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```
+
+### 2. 初始化并启动后端
+
+```powershell
+cd flowai-studio-backend
+npm install
+npx prisma generate
+npx prisma db push
+npx prisma db seed
+npm run start:dev
+```
+
+后端：`http://localhost:3000`
+健康检查：`http://localhost:3000/api/health`
+
+PowerShell 阻止 `npm.ps1` 时，在命令前加 `cmd /c`：
+
+```powershell
+cmd /c npx prisma db push
+cmd /c npx prisma db seed
+cmd /c npm run start:dev
+```
+
+### 3. 启动前端
+
+```powershell
+cd flowai-studio-frontend
+npm install
+npm run dev
+```
+
+浏览器访问：`http://localhost:5173`
+
+## Docker 完整启动
+
+先在项目根目录创建 `.env`：
+
+```dotenv
+POSTGRES_PASSWORD=请修改数据库密码
+JWT_SECRET=请替换为足够长且随机的字符串
+QWEN_API_KEY=你的通义千问_API_Key
+QWEN_EMBEDDING_API_KEY=你的通义千问_API_Key
+```
+
+首次启动：
+
+```powershell
+docker compose up -d postgres redis
+docker compose build backend frontend
+docker compose run --rm backend npx prisma db push
+docker compose run --rm backend npx prisma db seed
+docker compose up -d
+```
+
+- 前端：`http://localhost`
+- 后端：`http://localhost:3000`
+
+Compose 当前不会自动执行 Prisma 初始化，新数据库必须先运行 `db push` 和 `db seed`。
+
+## 默认演示数据
+
+执行 Seed 后会创建：
+
+- 账号：`admin`
+- 密码：`admin123`
+- 知识库：`Default Knowledge Base`
+- 文档：`FlowAI Studio Introduction.md`
+- 默认 RAG 演示应用和工作流
+
+默认密码仅供本地演示，部署到可访问的网络前必须修改。
+
+## 测试与构建
+
+```powershell
+cd flowai-studio-backend
+npm test
+npm run build
+```
+
+```powershell
+cd flowai-studio-frontend
+npm run build
+npm run lint
+```
+
+## 当前限制
+
+- LLM 和 Embedding 都只使用 Qwen。
+- pgvector 的 Prisma 向量字段固定为 1024 维。
+- 向量存储只支持 pgvector，并与主 PostgreSQL 数据库共用同一套服务。
+- MCP 在容器中需要额外安装对应命令。
+- 自定义 HTTP 和代码工具权限较高，生产环境应增加网络控制、审计和更严格的沙箱。
+- 仓库没有独立 `LICENSE` 文件；后端 `package.json` 标记为 MIT，但原 README 写有“禁止商业用途”，两者冲突。在作者明确授权前，不应据此认定可商业使用。
+
+## 项目截图
+
+<img width="1612" height="961" alt="FlowAI Studio screenshot 1" src="https://github.com/user-attachments/assets/c58798f9-96f5-4415-968a-70e99a96e595" />
+<img width="1612" height="961" alt="FlowAI Studio screenshot 2" src="https://github.com/user-attachments/assets/bb0d912c-44a1-48ef-a25c-fb4a7560b1d8" />
+<img width="1612" height="961" alt="FlowAI Studio screenshot 3" src="https://github.com/user-attachments/assets/85ba1bc0-f2a7-4981-9a98-af057cf949f6" />
+<img width="1612" height="961" alt="FlowAI Studio screenshot 4" src="https://github.com/user-attachments/assets/a40c8ba6-ac10-4fb9-890f-b0a5758e4a37" />
+<img width="1612" height="961" alt="FlowAI Studio screenshot 5" src="https://github.com/user-attachments/assets/d457aff7-cfa4-4f81-aac8-f5496c36994f" />
+<img width="1612" height="961" alt="FlowAI Studio screenshot 6" src="https://github.com/user-attachments/assets/c10a3711-c73a-4ca9-af23-28f9bf225a3b" />
+<img width="1612" height="961" alt="FlowAI Studio screenshot 7" src="https://github.com/user-attachments/assets/dcc9bf67-52e3-4420-84d3-9f1693c38cf0" />

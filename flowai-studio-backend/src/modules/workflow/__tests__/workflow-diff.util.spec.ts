@@ -46,7 +46,7 @@ describe('workflow-diff.util', () => {
         { id: 'a', type: 'llm', data: { model: 'qwen-turbo', temperature: 0.7 } },
       ];
       const newNodes = [
-        { id: 'a', type: 'llm', data: { model: 'gpt-4o', temperature: 0.7 } },
+        { id: 'a', type: 'llm', data: { model: 'qwen-plus', temperature: 0.7 } },
       ];
 
       const diff = diffWorkflow(oldNodes, [], newNodes, []);
@@ -57,7 +57,7 @@ describe('workflow-diff.util', () => {
       expect(diff.modifiedNodes[0].changes[0]).toEqual({
         field: 'data.model',
         oldValue: 'qwen-turbo',
-        newValue: 'gpt-4o',
+        newValue: 'qwen-plus',
       });
     });
 
@@ -163,7 +163,7 @@ describe('workflow-diff.util', () => {
         { id: 'a', type: 'agent', data: { workers: [{ id: 'w1', model: 'qwen-turbo' }] } },
       ];
       const newNodes = [
-        { id: 'a', type: 'agent', data: { workers: [{ id: 'w1', model: 'gpt-4o' }] } },
+        { id: 'a', type: 'agent', data: { workers: [{ id: 'w1', model: 'qwen-plus' }] } },
       ];
 
       const diff = diffWorkflow(oldNodes, [], newNodes, []);
@@ -203,7 +203,7 @@ describe('workflow-diff.util', () => {
       ];
       const newNodes = [
         { id: 'start', type: 'start', data: {} },
-        { id: 'llm', type: 'llm', data: { model: 'gpt-4o' } }, // modified
+        { id: 'llm', type: 'llm', data: { model: 'qwen-plus' } }, // modified
         { id: 'new_agent', type: 'agent', data: {} }, // added
       ];
       const newEdges = [

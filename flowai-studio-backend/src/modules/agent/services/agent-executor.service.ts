@@ -2,7 +2,7 @@
  * Agent 执行引擎
  *
  * Phase 3.1: Supervisor/Worker 模式 ReAct 循环
- * Phase 3.2: 多模型支持，通过 LLMProviderFactory 自动路由
+ * Phase 3.2: 通过 LLMProviderFactory 统一调用 Qwen
  *
  * 核心能力:
  * - Single Agent ReAct 循环（推理 + 行动）

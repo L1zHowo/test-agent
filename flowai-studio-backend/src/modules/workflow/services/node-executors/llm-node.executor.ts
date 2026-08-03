@@ -52,12 +52,8 @@ export class LLMNodeExecutor implements INodeExecutor {
   /**
    * 根据模型名称推断 Provider
    */
-  private inferProvider(model: string): string {
-    if (model.startsWith('gpt-') || model.startsWith('o1-')) return 'openai';
-    if (model.startsWith('claude-')) return 'claude';
-    if (model.startsWith('gemini-')) return 'gemini';
-    if (model.startsWith('qwen-')) return 'qwen';
-    return 'unknown';
+  private inferProvider(_model: string): string {
+    return 'qwen';
   }
 
   private resolveVariables(template: string, context: Record<string, any>): string {

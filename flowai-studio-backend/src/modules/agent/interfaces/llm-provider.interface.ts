@@ -1,20 +1,8 @@
 /**
  * LLM Provider 接口定义
  *
- * Phase 3.2: 多模型支持
+ * Qwen LLM 接口
  *
- * 设计理念:
- * - 工厂 + 注册表模式，按需创建 LLM Provider
- * - 统一接口，屏蔽各厂商 API 差异
- * - 支持模型能力查询（Function Calling、Vision、Streaming 等）
- * - 支持健康检查和成本估算
- *
- * 竞品对标:
- * - Dify: 支持 OpenAI/Azure/Anthropic/Gemini/通义千问/智谱/百川/MiniMax/本地 Ollama
- * - Coze: 仅支持字节跳动豆包系列
- * - n8n: 支持 OpenAI/Anthropic/Gemini/Azure/Ollama
- * - LangChain: 50+ Provider 适配器
- * - 本设计: OpenAI/Claude/Gemini/Qwen/Ollama 5 大主流 + 注册表模式可扩展
  */
 
 import { ToolDefinition as _ToolDefinition, ToolCall as _ToolCall } from './agent.interface';
@@ -28,7 +16,7 @@ export type ToolCall = _ToolCall;
 // ============================================================
 
 /** LLM Provider 类型 */
-export type LLMProviderType = 'openai' | 'claude' | 'gemini' | 'qwen' | 'ollama';
+export type LLMProviderType = 'qwen';
 
 /** LLM 模型能力 */
 export interface LLMModelCapabilities {
@@ -48,7 +36,7 @@ export interface LLMModelCapabilities {
 
 /** 模型信息 */
 export interface LLMModelInfo {
-  /** 模型 ID（如 gpt-4o, claude-3-5-sonnet-20241022） */
+  /** Qwen 模型 ID */
   id: string;
   /** 显示名称 */
   displayName: string;

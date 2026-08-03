@@ -7,7 +7,7 @@
  * 竞品对标:
  * - Dify: 向量检索使用 cosine similarity + HNSW 索引
  * - FastGPT: 向量检索使用 MongoDB Atlas Vector Search
- * - 本设计: 支持多种 VectorStore（pgvector/Qdrant/Milvus），HNSW 索引加速
+ * - 本设计: 使用 pgvector 与 HNSW 索引加速
  */
 import { Injectable, Logger } from '@nestjs/common';
 import {

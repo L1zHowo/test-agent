@@ -8,20 +8,13 @@
  * - 文档上传/删除/更新时自动失效相关缓存
  *
  * Phase 2.3 增强:
- * - 新增 Reranker 集成：检索结果自动重排序，提高 Top-K 精度
- * - 支持 Cohere Rerank（云端）+ Ollama 本地 Reranker（零成本）
  * - 更多文档格式支持: PDF (pdf-parse) + DOCX (mammoth)
- * - 降级策略: Reranker 不可用时跳过，返回原始检索结果
  *
  * Phase 2.2:
  * - 混合检索: vector / keyword / hybrid 三种检索模式
  * - BM25 关键词检索 + RRF 融合 + 自适应降级
  *
  * 竞品对标:
- * - Dify: 支持 vector/keyword/hybrid + Cohere Rerank（不支持本地 Reranker）+ Redis 缓存
- * - FastGPT: 支持 vector/fullText/hybrid + Cohere Rerank + Redis 缓存
- * - Coze: 仅向量检索，无 Reranker + 多层缓存
- * - Flowise: 支持 vector + keyword + HuggingFace/Cohere Reranker + 内存缓存
  * - 本设计: RRF 融合 + Cohere + Ollama + L1/L2 多级缓存 + 互斥锁防击穿
  */
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
@@ -40,7 +33,6 @@ import {
 } from '../interfaces/retrieval-strategy.interface';
 import { BM25KeywordService } from './bm25-keyword.service';
 import { RRFFusionService } from './rrf-fusion.service';
-import { RerankerFactory, RerankerType } from '../providers/reranker/reranker.factory';
 import { CacheTTL, CachePrefix } from '../../../common/decorators/cache.decorator';
 import * as fs from 'fs';
 
@@ -54,7 +46,6 @@ export class RAGService {
     private vectorStoreFactory: VectorStoreFactory,
     private bm25Service: BM25KeywordService,
     private rrfFusionService: RRFFusionService,
-    private rerankerFactory: RerankerFactory,
     private cacheService: CacheService,
   ) {}
 
@@ -446,7 +437,6 @@ export class RAGService {
    * 流程:
    * 1. 查检索缓存（L1 + L2）
    * 2. 根据 retrievalMode 执行检索（vector / keyword / hybrid）
-   * 3. 如果知识库启用了 Reranker，对检索结果重排序
    * 4. 写入缓存并返回最终结果
    *
    * Phase 2.4 缓存策略:
@@ -455,14 +445,8 @@ export class RAGService {
    * - 文档增删时自动失效
    *
    * Phase 2.3 增强:
-   * - 检索后自动 Rerank（如知识库配置了 reranker）
-   * - Reranker 降级：Reranker 不可用时返回原始检索结果
    *
    * 竞品对标:
-   * - Dify: 支持 vector/keyword/hybrid + Cohere Rerank + Redis 缓存
-   * - FastGPT: 支持 vector/fullText/hybrid + Cohere Rerank + Redis 缓存
-   * - Coze: 仅向量检索，无 Reranker + 多层缓存
-   * - 本设计: 检索 + Rerank + L1/L2 缓存 + 自适应降级
    */
   async retrieve(
     query: string,
@@ -509,89 +493,13 @@ export class RAGService {
         break;
     }
 
-    // 5. Reranker 重排序（如知识库启用）
-    results = await this.applyReranker(query, results, kb, effectiveTopK);
 
-    // 6. 写入检索缓存（短 TTL，因为检索结果随文档增删变化）
+    // 5. 写入检索缓存（短 TTL，因为检索结果随文档增删变化）
     await this.cacheService.set(cacheKey, results, CacheTTL.KNOWLEDGE_BASE_RETRIEVAL);
 
     return results;
   }
 
-  /**
-   * 对检索结果应用 Reranker 重排序
-   *
-   * 策略:
-   * - 如果知识库未启用 Reranker → 跳过，返回原始结果
-   * - 如果 Reranker 调用失败 → 降级，返回原始结果
-   * - rerankerTopN 用于控制重排序后保留的文档数
-   *
-   * 竞品对标:
-   * - Dify: 支持 Rerank TopN 配置
-   * - FastGPT: 支持 Rerank TopN 配置
-   * - 本设计: TopN 配置 + 降级保护 + 耗时日志
-   */
-  private async applyReranker(query: string, results: any[], kb: any, topK: number): Promise<any[]> {
-    const rerankerEnabled = (kb as any).rerankerEnabled ?? false;
-    const rerankerProvider = (kb as any).rerankerProvider ?? 'none';
-    const rerankerModel = (kb as any).rerankerModel ?? '';
-    const rerankerTopN = (kb as any).rerankerTopN ?? topK;
-
-    if (!rerankerEnabled || rerankerProvider === 'none') {
-      return results;
-    }
-
-    if (results.length === 0) {
-      return results;
-    }
-
-    try {
-      const startTime = Date.now();
-
-      const reranker = this.rerankerFactory.create(
-        rerankerProvider as RerankerType,
-        {
-          model: rerankerModel || undefined,
-        },
-      );
-
-      const rerankResult = await reranker.rerank({
-        query,
-        documents: results.map((r) => ({
-          id: r.id,
-          content: r.content,
-          originalScore: r.similarity,
-          metadata: r.metadata,
-        })),
-        topN: rerankerTopN,
-      });
-
-      const elapsed = Date.now() - startTime;
-      this.logger.log(
-        `Reranker applied: ${rerankerProvider} (${reranker.getModel()}), ` +
-        `${results.length} → ${rerankResult.results.length} docs, ` +
-        `elapsed=${elapsed}ms` +
-        (rerankResult.tokenUsage ? `, tokens=${rerankResult.tokenUsage.totalTokens}` : ''),
-      );
-
-      // 用 rerank 结果替换原始排序
-      return rerankResult.results.map((r) => ({
-        id: r.id,
-        content: r.content,
-        documentId: r.metadata?.documentId || '',
-        documentName: '',  // 需要补充
-        similarity: r.relevanceScore,
-        originalSimilarity: r.originalScore,
-        rerankerScore: r.relevanceScore,
-        metadata: r.metadata,
-      }));
-    } catch (error) {
-      this.logger.warn(
-        `Reranker failed, returning original results: ${error instanceof Error ? error.message : error}`,
-      );
-      return results;
-    }
-  }
 
   /**
    * 纯向量检索
@@ -850,23 +758,19 @@ export class RAGService {
   /**
    * 根据知识库配置获取对应的 EmbeddingProvider
    */
-  private getEmbeddingProviderForKB(kb: { embeddingProvider?: string; embeddingModel: string; embeddingDimension: number }): EmbeddingProvider {
-    const providerType = kb.embeddingProvider || this.inferProviderType(kb.embeddingModel);
-
-    return this.embeddingFactory.create(providerType, {
-      model: kb.embeddingModel,
-      dimensions: kb.embeddingDimension,
-    });
+  private getEmbeddingProviderForKB(_kb: {
+    embeddingProvider?: string;
+    embeddingModel: string;
+    embeddingDimension: number;
+  }): EmbeddingProvider {
+    return this.embeddingFactory.create('qwen');
   }
 
   /**
    * 根据知识库配置获取对应的 VectorStore
    */
-  private getVectorStoreForKB(kb: { vectorStore?: string }): VectorStore {
-    if (kb.vectorStore) {
-      return this.vectorStoreFactory.create(kb.vectorStore);
-    }
-    return this.vectorStoreFactory.getDefaultStore();
+  private getVectorStoreForKB(_kb: { vectorStore?: string }): VectorStore {
+    return this.vectorStoreFactory.create('pgvector');
   }
 
   /**
@@ -876,22 +780,6 @@ export class RAGService {
     return this.vectorStoreFactory.getDefaultStore();
   }
 
-  /**
-   * 根据 embedding 模型名称推断 Provider 类型
-   */
-  private inferProviderType(model: string): string {
-    if (model.startsWith('text-embedding-v')) {
-      return 'qwen';
-    }
-    if (model.startsWith('text-embedding-3') || model.startsWith('text-embedding-ada')) {
-      return 'openai';
-    }
-    if (['nomic-embed-text', 'mxbai-embed-large', 'all-minilm', 'bge-m3'].includes(model)) {
-      return 'ollama';
-    }
-    this.logger.warn(`Unknown embedding model: ${model}, falling back to qwen provider`);
-    return 'qwen';
-  }
 
   // ============================================================
   // 文本处理

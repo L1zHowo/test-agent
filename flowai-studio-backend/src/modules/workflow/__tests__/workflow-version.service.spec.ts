@@ -214,7 +214,7 @@ describe('WorkflowVersionService', () => {
           edges: JSON.stringify([]),
         })
         .mockResolvedValueOnce({
-          nodes: JSON.stringify([{ id: 'a', type: 'llm', data: { model: 'gpt-4o' } }]),
+          nodes: JSON.stringify([{ id: 'a', type: 'llm', data: { model: 'qwen-plus' } }]),
           edges: JSON.stringify([]),
         });
 

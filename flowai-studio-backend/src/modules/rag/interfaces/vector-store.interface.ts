@@ -3,11 +3,11 @@
  *
  * 设计理念:
  * - 将向量存储和检索能力从 PrismaService 中解耦
- * - 支持多种向量数据库: pgvector / Qdrant / Milvus / Weaviate / Chroma
- * - 每个知识库可选择不同的向量存储后端
+ * - 将 pgvector 的向量操作收敛到统一接口
+ * - 隔离业务逻辑与具体存储实现
  *
  * 竞品对标:
- * - Dify: pgvector / Qdrant / Milvus / Weaviate / Opensearch / Pgvector
+ * - Dify: 通过统一接口管理向量存储
  * - FastGPT: MongoDB Atlas Vector Search
  * - n8n: 无内置向量存储
  * - LangChain: 抽象 VectorStore 接口 + 30+ 实现
@@ -112,13 +112,12 @@ export interface VectorStoreStats {
 /**
  * VectorStore 抽象接口
  *
- * 所有向量存储后端必须实现此接口
- * 包括: pgvector / Qdrant / Milvus / Weaviate / Chroma 等
+ * pgvector 存储实现此接口，供 RAG 服务统一调用
  */
 export interface VectorStore {
   /**
    * 获取存储类型标识
-   * e.g., 'pgvector', 'qdrant', 'milvus', 'weaviate', 'chroma'
+   * 当前固定为 'pgvector'
    */
   readonly storeType: string;
 

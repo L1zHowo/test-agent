@@ -239,7 +239,7 @@ model KnowledgeBase {
   // 向量维度 (根据模型不同而不同: text-embedding-v3=1024, text-embedding-v2=1536)
   embeddingDimension Int @default(1024)
 
-  // 向量存储后端: pgvector / qdrant / milvus
+  // 向量存储固定使用 pgvector
   vectorStore String @default("pgvector")
   
   // 分块配置
@@ -259,15 +259,6 @@ model KnowledgeBase {
   // RRF 融合常数 K (学术推荐值 60)
   rrfK Int @default(60)
   
-  // 重排序配置 (Phase 2.3)
-  // 是否启用重排序
-  rerankerEnabled Boolean @default(false)
-  // Reranker 类型: cohere / ollama / none
-  rerankerProvider String @default("none")
-  // Reranker 模型名称
-  rerankerModel String @default("")
-  // 重排序返回的文档数量 (null 表示不截断, 保持与 topK 一致)
-  rerankerTopN Int?
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

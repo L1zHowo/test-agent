@@ -199,7 +199,7 @@ export interface AgentExecutionResult {
 // Agent 服务接口
 // ============================================================
 
-/** LLM Provider 接口（为 Phase 3.2 多模型支持预留） */
+/** Qwen LLM Provider 接口 */
 export interface ILLMProvider {
   /** Provider 名称 */
   name: string;
