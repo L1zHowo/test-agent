@@ -165,7 +165,7 @@ export class WorkflowExecutorService {
           const output = await retryWithBackoff(
             () =>
               withTimeout(
-                executor.execute(node, context),
+                executor.execute(node, context, { sseSubject }),
                 control.nodeTimeoutMs,
                 'node',
                 nodeId,

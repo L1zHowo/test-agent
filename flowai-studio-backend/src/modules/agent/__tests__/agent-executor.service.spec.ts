@@ -200,8 +200,8 @@ describe('AgentExecutorService', () => {
 
       expect(result.success).toBe(false);
       expect(result.terminationReason).toBe('repeated_tool_call');
-      expect(result.iterations).toBe(2);
-      expect(mockSkillService.executeSkill).toHaveBeenCalledTimes(1);
+      expect(result.iterations).toBe(3);
+      expect(mockSkillService.executeSkill).toHaveBeenCalledTimes(3);
     });
     it('should produce execution trace', async () => {
       mockProvider.chat.mockResolvedValue({

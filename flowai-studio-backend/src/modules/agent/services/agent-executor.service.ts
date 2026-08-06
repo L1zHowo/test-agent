@@ -33,6 +33,8 @@ import {
 } from '../interfaces/agent.interface';
 import { LLMChatParams } from '../interfaces/llm-provider.interface';
 
+const UNCHANGED_TOOL_CALL_STREAK_LIMIT = 3;
+
 @Injectable()
 export class AgentExecutorService {
   private readonly logger = new Logger(AgentExecutorService.name);
@@ -76,6 +78,7 @@ export class AgentExecutorService {
       this.logger.error(
         `Agent execution failed: ${error instanceof Error ? error.message : error}`,
       );
+            this.pushSSE(options, { type: 'agent_error', data: { reason: 'error', message: error instanceof Error ? error.message : 'Unknown error' } });
       return {
         result: '',
         messages: [],
@@ -118,7 +121,10 @@ export class AgentExecutorService {
   ): Promise<AgentExecutionResult> {
     const agentConfig = config.singleAgent!;
     const maxIterations = options?.maxIterations ?? config.maxIterations ?? 10;
-    const seenToolCalls = new Set<string>();
+    let previousToolCallSignature: string | undefined;
+    let previousToolResultSignature: string | undefined;
+    let previousToolCallIteration: number | undefined;
+    let unchangedToolCallStreak = 0;
     let terminationReason: AgentTerminationReason = 'completed';
 
     // 初始化状态
@@ -209,11 +215,28 @@ export class AgentExecutorService {
         // 逐个执行工具
         for (const toolCall of llmResponse.toolCalls) {
           const signature = this.createToolCallSignature(toolCall);
-          if (seenToolCalls.has(signature)) {
+          const toolResult = await this.executeToolCall(
+            toolCall,
+            toolMap,
+            options?.context,
+          );
+          state.toolResults.push(toolResult);
+          const resultSignature = this.createToolResultSignature(toolResult);
+          unchangedToolCallStreak =
+            signature === previousToolCallSignature &&
+            resultSignature === previousToolResultSignature &&
+            state.iteration === (previousToolCallIteration ?? 0) + 1
+              ? unchangedToolCallStreak + 1
+              : 1;
+          previousToolCallSignature = signature;
+          previousToolResultSignature = resultSignature;
+          previousToolCallIteration = state.iteration;
+
+          if (unchangedToolCallStreak >= UNCHANGED_TOOL_CALL_STREAK_LIMIT) {
             terminationReason = 'repeated_tool_call';
             state.output =
               this.getLastAssistantMessage(state) ||
-              '检测到重复工具调用，已停止执行。';
+              'Detected the same call with the same result repeatedly; execution stopped.';
             this.pushSSE(options, {
               type: 'agent_stopped',
               data: { reason: terminationReason, message: state.output },
@@ -221,13 +244,6 @@ export class AgentExecutorService {
             state.finished = true;
             break executionLoop;
           }
-          seenToolCalls.add(signature);
-          const toolResult = await this.executeToolCall(
-            toolCall,
-            toolMap,
-            options?.context,
-          );
-          state.toolResults.push(toolResult);
 
           // 将工具结果添加到消息历史
           state.messages.push({
@@ -265,7 +281,18 @@ export class AgentExecutorService {
               success: toolResult.success,
             },
           });
-        }
+                  this.pushSSE(options, {
+            type: 'agent_tool_result',
+            data: {
+              agentId: agentConfig.id,
+              toolCallId: toolResult.toolCallId,
+              toolName: toolResult.toolName,
+              success: toolResult.success,
+              result: toolResult.result,
+              error: toolResult.error,
+            },
+          });
+}
       } else {
         // 没有工具调用，LLM 给出最终答案
         state.output = llmResponse.content || '';
@@ -301,6 +328,7 @@ export class AgentExecutorService {
       state.output =
         this.getLastAssistantMessage(state) ||
         'Agent 达到最大迭代次数，未能完成任务。';
+      this.pushSSE(options, { type: 'agent_stopped', data: { reason: terminationReason, message: state.output } });
 
       this.pushTrace(state, {
         type: 'error',
@@ -344,7 +372,10 @@ export class AgentExecutorService {
   ): Promise<AgentExecutionResult> {
     const supervisorConfig = config.supervisor!;
     const maxIterations = options?.maxIterations ?? config.maxIterations ?? 15;
-    const seenDelegations = new Set<string>();
+    let previousDelegationSignature: string | undefined;
+    let previousDelegationResultSignature: string | undefined;
+    let previousDelegationIteration: number | undefined;
+    let unchangedDelegationStreak = 0;
     let terminationReason: AgentTerminationReason = 'completed';
 
     // 初始化状态
@@ -493,19 +524,6 @@ export class AgentExecutorService {
         } else {
           // 委派给 Worker
           const signature = this.createToolCallSignature(toolCall);
-          if (seenDelegations.has(signature)) {
-            terminationReason = 'repeated_tool_call';
-            state.output =
-              this.getLastAssistantMessage(state) ||
-              '检测到重复的 Worker 委派，已停止执行。';
-            this.pushSSE(options, {
-              type: 'agent_stopped',
-              data: { reason: terminationReason, message: state.output },
-            });
-            state.finished = true;
-            break executionLoop;
-          }
-          seenDelegations.add(signature);
 
           const workerId = this.extractWorkerId(
             toolCall.name,
@@ -538,6 +556,41 @@ export class AgentExecutorService {
               workerInfo.toolMap,
               options,
             );
+
+            const resultSignature = this.createToolResultSignature({
+              toolCallId: toolCall.id,
+              toolName: toolCall.name,
+              result: workerResult.result,
+              success: workerResult.success,
+              error: workerResult.error,
+            });
+            unchangedDelegationStreak =
+              signature === previousDelegationSignature &&
+              resultSignature === previousDelegationResultSignature &&
+              state.iteration === (previousDelegationIteration ?? 0) + 1
+                ? unchangedDelegationStreak + 1
+                : 1;
+            previousDelegationSignature = signature;
+            previousDelegationResultSignature = resultSignature;
+            previousDelegationIteration = state.iteration;
+
+            if (unchangedDelegationStreak >= UNCHANGED_TOOL_CALL_STREAK_LIMIT) {
+              terminationReason = 'repeated_tool_call';
+              state.output = workerResult.result;
+              this.pushSSE(options, {
+                type: 'agent_stopped',
+                data: { reason: terminationReason, message: state.output },
+              });
+              state.finished = true;
+              break executionLoop;
+            }
+
+            if (!workerResult.success) {
+              state.output = workerResult.result;
+              terminationReason = workerResult.terminationReason;
+              state.finished = true;
+              break executionLoop;
+            }
 
             // 将 Worker 结果添加到 Supervisor 的消息历史
             state.messages.push({
@@ -597,6 +650,7 @@ export class AgentExecutorService {
       state.output =
         this.getLastAssistantMessage(state) ||
         'Supervisor 达到最大迭代次数，未能完成任务。';
+      this.pushSSE(options, { type: 'agent_stopped', data: { reason: terminationReason, message: state.output } });
 
       this.pushTrace(state, {
         type: 'error',
@@ -631,7 +685,10 @@ export class AgentExecutorService {
     options?: AgentRunOptions,
   ): Promise<AgentExecutionResult> {
     const maxIterations = 5; // Worker 最多 5 轮迭代
-    const seenToolCalls = new Set<string>();
+    let previousToolCallSignature: string | undefined;
+    let previousToolResultSignature: string | undefined;
+    let previousToolCallIteration: number | undefined;
+    let unchangedToolCallStreak = 0;
     let terminationReason: AgentTerminationReason = 'completed';
 
     const state: AgentState = {
@@ -695,11 +752,28 @@ export class AgentExecutorService {
 
         for (const toolCall of llmResponse.toolCalls) {
           const signature = this.createToolCallSignature(toolCall);
-          if (seenToolCalls.has(signature)) {
+          const toolResult = await this.executeToolCall(
+            toolCall,
+            toolMap,
+            options?.context,
+          );
+          state.toolResults.push(toolResult);
+          const resultSignature = this.createToolResultSignature(toolResult);
+          unchangedToolCallStreak =
+            signature === previousToolCallSignature &&
+            resultSignature === previousToolResultSignature &&
+            state.iteration === (previousToolCallIteration ?? 0) + 1
+              ? unchangedToolCallStreak + 1
+              : 1;
+          previousToolCallSignature = signature;
+          previousToolResultSignature = resultSignature;
+          previousToolCallIteration = state.iteration;
+
+          if (unchangedToolCallStreak >= UNCHANGED_TOOL_CALL_STREAK_LIMIT) {
             terminationReason = 'repeated_tool_call';
             state.output =
               this.getLastAssistantMessage(state) ||
-              '检测到重复工具调用，已停止执行。';
+              'Detected the same call with the same result repeatedly; execution stopped.';
             this.pushSSE(options, {
               type: 'agent_stopped',
               data: { reason: terminationReason, message: state.output },
@@ -707,19 +781,23 @@ export class AgentExecutorService {
             state.finished = true;
             break executionLoop;
           }
-          seenToolCalls.add(signature);
-          const toolResult = await this.executeToolCall(
-            toolCall,
-            toolMap,
-            options?.context,
-          );
-          state.toolResults.push(toolResult);
 
           state.messages.push({
             role: 'tool',
             content: JSON.stringify(toolResult.result),
             agentId: workerConfig.id,
             timestamp: Date.now(),
+          });
+          this.pushSSE(options, {
+            type: 'agent_tool_result',
+            data: {
+              agentId: workerConfig.id,
+              toolCallId: toolResult.toolCallId,
+              toolName: toolResult.toolName,
+              success: toolResult.success,
+              result: toolResult.result,
+              error: toolResult.error,
+            },
           });
         }
       } else {
@@ -739,6 +817,10 @@ export class AgentExecutorService {
       terminationReason = 'max_iterations';
       state.output =
         this.getLastAssistantMessage(state) || 'Worker 未能完成任务。';
+      this.pushSSE(options, {
+        type: 'agent_stopped',
+        data: { reason: terminationReason, message: state.output },
+      });
     }
 
     return {
@@ -771,6 +853,14 @@ export class AgentExecutorService {
     return JSON.stringify({
       name: toolCall.name,
       arguments: this.sortForSignature(toolCall.arguments),
+    });
+  }
+
+  private createToolResultSignature(toolResult: ToolResult): string {
+    return JSON.stringify({
+      success: toolResult.success,
+      result: this.sortForSignature(toolResult.result),
+      error: toolResult.error,
     });
   }
 

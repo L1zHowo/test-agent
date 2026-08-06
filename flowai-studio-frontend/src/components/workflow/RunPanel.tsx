@@ -15,13 +15,39 @@ import './RunPanel.css'
 
 const { TextArea } = Input
 
+const AGENT_EVENT_LABELS: Record<string, string> = {
+  agent_thinking: 'Agent 思考中',
+  agent_tool_call: '调用工具',
+  agent_tool_result: '工具返回',
+  agent_final_answer: 'Agent 完成',
+  agent_stopped: 'Agent 已停止',
+  agent_error: 'Agent 异常',
+  supervisor_thinking: 'Supervisor 思考中',
+  worker_delegated: '已委派 Worker',
+  worker_completed: 'Worker 完成',
+  supervisor_final_answer: 'Supervisor 完成',
+}
+
+const getAgentEventText = (event: { type: string; data?: Record<string, unknown> }) => {
+  const data = event.data || {}
+  if (event.type === 'agent_tool_result') {
+    return String(data.toolName || '工具') + '：' + JSON.stringify(data.result ?? data.error ?? '')
+  }
+  if (event.type === 'agent_tool_call') {
+    return String(data.toolName || '工具') + '（' + (data.success === false ? '失败' : '已发起') + '）'
+  }
+  return String(data.message || data.output || data.task || '')
+}
+
 const RunPanel: React.FC = () => {
   const {
     currentWorkflow,
     nodes,
     executionStates,
+    agentEvents,
     executionStatus,
     streamRunWorkflow,
+    stopStreamWorkflow,
     setExecutionStatus,
     clearExecutionStates,
   } = useStore()
@@ -50,9 +76,11 @@ const RunPanel: React.FC = () => {
     }
   }
 
-  const handleStop = () => {
+  const handleStop = async () => {
+    const workflowId = currentWorkflow?.id
+    if (!workflowId) return
     setIsRunning(false)
-    setExecutionStatus('stopped')
+    await stopStreamWorkflow(workflowId)
   }
 
   const handleClear = () => {
@@ -146,6 +174,20 @@ const RunPanel: React.FC = () => {
                 ? '执行失败'
                 : '已停止'}
             </span>
+          </div>
+        )}
+
+        {agentEvents.length > 0 && (
+          <div className="run-results">
+            <label className="run-section-label">Agent 流式事件</label>
+            {agentEvents.map((event, index) => (
+              <div key={event.type + '-' + index} className="run-result-card">
+                <strong>{AGENT_EVENT_LABELS[event.type] || event.type}</strong>
+                <div>
+                  {getAgentEventText(event)}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

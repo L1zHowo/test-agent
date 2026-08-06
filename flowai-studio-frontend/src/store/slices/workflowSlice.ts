@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand'
-import { Workflow, WorkflowNode, WorkflowEdge, NodeExecution } from '../../types'
+import { Workflow, WorkflowNode, WorkflowEdge, NodeExecution, AgentStreamEvent, WorkflowExecutionStatus } from '../../types'
 import request from '../../utils/axios'
 import { 
   OnNodesChange, 
@@ -12,6 +12,8 @@ import {
 
 import { createParser } from 'eventsource-parser'
 
+let activeStreamController: AbortController | null = null
+
 export interface WorkflowSlice {
   workflows: Workflow[]
   currentWorkflow: Workflow | null
@@ -20,7 +22,9 @@ export interface WorkflowSlice {
   selectedNode: WorkflowNode | null
   canvasZoom: number
   executionStates: Record<string, NodeExecution>
-  executionStatus: string | null
+  agentEvents: AgentStreamEvent[]
+  executionStatus: WorkflowExecutionStatus | null
+  activeExecutionId: string | null
   isLoading: boolean
   
   // Actions
@@ -35,7 +39,7 @@ export interface WorkflowSlice {
   updateNodeData: (nodeId: string, data: any) => void
   setCanvasZoom: (zoom: number) => void
   setExecutionState: (nodeId: string, state: NodeExecution) => void
-  setExecutionStatus: (status: string | null) => void
+  setExecutionStatus: (status: WorkflowExecutionStatus | null) => void
   setExecutionStates: (states: Record<string, NodeExecution>) => void
   fetchWorkflows: (appId: string) => Promise<Workflow[]>
   fetchWorkflowById: (id: string) => Promise<Workflow>
@@ -44,6 +48,7 @@ export interface WorkflowSlice {
   saveWorkflow: (id: string, data: { nodes: WorkflowNode[]; edges: WorkflowEdge[] }) => Promise<Workflow>
   runWorkflow: (workflowId: string) => Promise<any>
   streamRunWorkflow: (workflowId: string, inputs: Record<string, any>) => Promise<void>
+  stopStreamWorkflow: (workflowId: string) => Promise<void>
   deleteWorkflow: (id: string) => Promise<void>
   clearExecutionStates: () => void
 }
@@ -56,7 +61,9 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
   selectedNode: null,
   canvasZoom: 1,
   executionStates: {},
+  agentEvents: [],
   executionStatus: null,
+  activeExecutionId: null,
   isLoading: false,
 
   setWorkflows: (workflows) => set({ workflows }),
@@ -133,16 +140,20 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
   },
 
   streamRunWorkflow: async (workflowId, inputs) => {
-    set({ executionStatus: 'running', executionStates: {} })
+    activeStreamController?.abort()
+    const controller = new AbortController()
+    activeStreamController = controller
+    set({ executionStatus: 'running', executionStates: {}, agentEvents: [], activeExecutionId: null })
     
     try {
-      const response = await fetch(`/api/workflows/${workflowId}/run/stream`, {
+      const response = await fetch('/api/workflows/' + workflowId + '/run/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': 'Bearer ' + localStorage.getItem('token')
         },
-        body: JSON.stringify({ inputs })
+        body: JSON.stringify({ inputs }),
+        signal: controller.signal,
       })
 
       if (!response.ok) throw new Error('Stream request failed')
@@ -154,7 +165,14 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
         if (event.type === 'event') {
           try {
             const data = JSON.parse(event.data)
-            if (data.type === 'node_status') {
+            const isAgentEvent = data.type.startsWith('agent_') ||
+              data.type.startsWith('supervisor_') ||
+              data.type.startsWith('worker_')
+            if (isAgentEvent) {
+              set((state) => ({ agentEvents: [...state.agentEvents, data] }))
+            } else if (data.type === 'workflow_start') {
+              set({ activeExecutionId: data.data?.executionId || null })
+            } else if (data.type === 'node_status') {
               const { nodeId, status, output, error } = data.data
               set((state) => ({
                 executionStates: {
@@ -179,12 +197,35 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
         if (done) break
         parser.feed(decoder.decode(value))
       }
+      set({ activeExecutionId: null })
     } catch (error) {
-      set({ executionStatus: 'failed' })
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      set({ executionStatus: 'failed', activeExecutionId: null })
       throw error
+    } finally {
+      activeStreamController = null
     }
   },
 
+  stopStreamWorkflow: async (workflowId) => {
+    const executionId = get().activeExecutionId
+    set({ executionStatus: 'stopped' })
+
+    try {
+      if (executionId) {
+        await fetch('/api/workflows/' + workflowId + '/cancel/' + executionId, {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer ' + localStorage.getItem('token'),
+          },
+        })
+      }
+    } finally {
+      activeStreamController?.abort()
+      activeStreamController = null
+      set({ activeExecutionId: null })
+    }
+  },
   fetchWorkflows: async (appId) => {
     set({ isLoading: true })
     try {
@@ -274,5 +315,5 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     }
   },
 
-  clearExecutionStates: () => set({ executionStates: {} }),
+  clearExecutionStates: () => set({ executionStates: {}, agentEvents: [], activeExecutionId: null }),
 })

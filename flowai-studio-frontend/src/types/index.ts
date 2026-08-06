@@ -256,6 +256,13 @@ export interface Skill {
 }
 
 // 节点执行状态
+export interface AgentStreamEvent {
+  type: string
+  data?: Record<string, unknown>
+}
+
+export type WorkflowExecutionStatus = 'running' | 'success' | 'failed' | 'stopped'
+
 export type NodeExecutionStatus = 'pending' | 'running' | 'success' | 'failed'
 
 export interface NodeExecution {

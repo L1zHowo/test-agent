@@ -10,7 +10,7 @@
  * - swarm: 去中心化协作（后续扩展）
  */
 import { Injectable } from '@nestjs/common';
-import { INodeExecutor } from '../../types';
+import { INodeExecutor, NodeExecutionOptions } from '../../types';
 import { AgentExecutorService } from '../../../agent/services/agent-executor.service';
 import {
   AgentNodeConfig,
@@ -24,16 +24,27 @@ export class AgentNodeExecutor implements INodeExecutor {
   async execute(
     node: any,
     context: Record<string, any>,
+    options?: NodeExecutionOptions,
   ): Promise<Record<string, any>> {
     const nodeData = node.data as any;
     const config = this.buildAgentConfig(nodeData);
     const input = this.resolveInput(nodeData.userPrompt, context);
 
-    const options: AgentRunOptions = {
+    const agentOptions: AgentRunOptions = {
       context,
+      sseSubject: options?.sseSubject,
     };
 
-    const result = await this.agentExecutor.execute(config, input, options);
+    const result = await this.agentExecutor.execute(config, input, agentOptions);
+
+    if (!result.success) {
+      const error = new Error(
+        'Agent terminated: ' + result.terminationReason,
+      ) as Error & { terminationReason?: string; agentResult?: typeof result };
+      error.terminationReason = result.terminationReason;
+      error.agentResult = result;
+      throw error;
+    }
 
     return {
       result: result.result,
