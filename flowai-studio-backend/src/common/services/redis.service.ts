@@ -154,50 +154,6 @@ export class RedisService implements OnModuleDestroy {
     return value;
   }
 
-  // ============================================================
-  // 限流操作
-  // ============================================================
-
-  /**
-   * 滑动窗口限流
-   * @param key 限流键 (如: rate_limit:api:userId)
-   * @param windowSeconds 窗口时间（秒）
-   * @param maxRequests 窗口内最大请求数
-   * @returns 是否允许请求
-   */
-  async rateLimit(key: string, windowSeconds: number, maxRequests: number): Promise<{ allowed: boolean; remaining: number; retryAfter?: number }> {
-    const now = Date.now();
-    const windowStart = now - windowSeconds * 1000;
-
-    // 使用 Redis Sorted Set 实现滑动窗口
-    const multi = this.client.multi();
-
-    // 移除窗口外的旧记录
-    multi.zremrangebyscore(key, 0, windowStart);
-
-    // 添加当前请求
-    multi.zadd(key, now, `${now}-${Math.random()}`);
-
-    // 获取窗口内的请求数
-    multi.zcard(key);
-
-    // 设置 key 过期时间
-    multi.expire(key, windowSeconds);
-
-    const results = await multi.exec();
-    const count = results?.[2]?.[1] as number || 0;
-
-    if (count > maxRequests) {
-      // 获取最早的请求时间，计算重试等待时间
-      const earliest = await this.client.zrange(key, 0, 0, 'WITHSCORES');
-      const earliestTime = earliest.length >= 2 ? Number(earliest[1]) : now;
-      const retryAfter = Math.ceil((earliestTime + windowSeconds * 1000 - now) / 1000);
-
-      return { allowed: false, remaining: 0, retryAfter };
-    }
-
-    return { allowed: true, remaining: maxRequests - count };
-  }
 
   // ============================================================
   // 登录安全操作 (替代内存 Map)

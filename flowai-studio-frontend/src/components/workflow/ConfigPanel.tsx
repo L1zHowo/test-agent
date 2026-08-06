@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Form, Input, Select, Slider, InputNumber, Switch, Divider, Card, Button, Space, Tag, Empty, Typography } from 'antd'
-import { PlusOutlined, DeleteOutlined, RobotOutlined } from '@ant-design/icons'
+import { Form, Input, Select, Slider, InputNumber, Switch, Divider, Card, Button, Space, Tag, Empty, Typography, Tooltip, message } from 'antd'
+import { PlusOutlined, DeleteOutlined, RobotOutlined, CopyOutlined } from '@ant-design/icons'
 import { useStore } from '../../store'
 
 const { Option, OptGroup } = Select
@@ -67,6 +67,12 @@ const ConfigPanel: React.FC = () => {
     if (selectedNode) {
       updateNodeData(selectedNode.id, allValues)
     }
+  }
+
+  const handleCopyNodeId = async () => {
+    if (!selectedNode) return
+    await navigator.clipboard.writeText(selectedNode.id)
+    message.success('节点 ID 已复制')
   }
 
   const addWorker = () => {
@@ -224,9 +230,22 @@ const ConfigPanel: React.FC = () => {
     }
 
     const commonFields = (
-      <Form.Item name="label" label="节点名称">
-        <Input placeholder="输入节点名称" />
-      </Form.Item>
+      <>
+        <Form.Item name="label" label="节点名称">
+          <Input placeholder="输入节点名称" />
+        </Form.Item>
+        <Form.Item label="节点 ID" extra="可用于引用节点输出，例如 {{节点ID.result}}">
+          <Input
+            value={selectedNode.id}
+            readOnly
+            addonAfter={(
+              <Tooltip title="复制节点 ID">
+                <Button type="text" size="small" icon={<CopyOutlined />} onClick={handleCopyNodeId} aria-label="复制节点 ID" />
+              </Tooltip>
+            )}
+          />
+        </Form.Item>
+      </>
     )
 
     switch (selectedNode.type) {

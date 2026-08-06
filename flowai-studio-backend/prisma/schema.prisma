@@ -99,7 +99,6 @@ model Workflow {
   executions WorkflowExecution[]
   versions   WorkflowVersion[]
   tokenUsageRecords TokenUsageRecord[]
-  traces           WorkflowTrace[]
 
 
   @@map("workflows")
@@ -572,86 +571,4 @@ model TokenUsageRecord {
   @@index([userId, createdAt])
   @@index([applicationId, createdAt])
   @@map("token_usage_records")
-}
-
-// ============================================================
-// 全链路 Trace
-// ============================================================
-
-// 工作流执行 Trace
-model WorkflowTrace {
-  id String @id @default(uuid())
-
-  // Trace 标识
-  traceId String @unique
-
-  // 关联资源
-  userId        String?
-  applicationId String?
-  workflowId    String
-  executionId   String?
-
-  // 执行信息
-  status    String  @default("running") // running, success, failed, cancelled
-  totalMs   Int?    // 总耗时
-  spanCount Int     @default(0)
-
-  // 元数据
-  inputs  String? // JSON
-  outputs String? // JSON
-  error   String?
-
-  startedAt   DateTime  @default(now())
-  completedAt DateTime?
-  createdAt   DateTime  @default(now())
-
-  // 外键
-  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-
-  // 关联
-  spans SpanRecord[]
-
-  @@index([traceId])
-  @@index([workflowId])
-  @@index([userId])
-  @@index([createdAt])
-  @@index([status])
-  @@map("workflow_traces")
-}
-
-// Span 记录
-model SpanRecord {
-  id String @id @default(uuid())
-
-  // Span 标识
-  spanId String @unique
-  traceId String
-
-  // 父 Span
-  parentSpanId String?
-
-  // Span 信息
-  name     String // 节点名称/操作名称
-  kind     String @default("internal") // internal, client, server, producer, consumer
-  status   String @default("ok") // ok, error, timeout
-
-  // 时间
-  startTime DateTime
-  endTime   DateTime?
-  durationMs Int?
-
-  // 属性 (JSON)
-  attributes String?
-
-  // 事件 (JSON)
-  events String?
-
-  // 关联
-  trace WorkflowTrace @relation(fields: [traceId], references: [traceId], onDelete: Cascade)
-
-  @@index([traceId])
-  @@index([spanId])
-  @@index([parentSpanId])
-  @@index([startTime])
-  @@map("span_records")
 }

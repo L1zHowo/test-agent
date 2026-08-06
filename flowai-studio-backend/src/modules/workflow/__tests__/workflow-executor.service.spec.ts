@@ -42,6 +42,10 @@ describe('WorkflowExecutorService', () => {
       workflow: {
         findUnique: jest.fn(),
       },
+      workflowExecution: {
+        create: jest.fn(),
+        update: jest.fn(),
+      },
     };
 
     service = new WorkflowExecutorService(mockPrisma, mockFactory);
@@ -96,6 +100,25 @@ describe('WorkflowExecutorService', () => {
       await service.executeWorkflow('wf_1', { inputs: { question: 'hello' } });
 
       expect(capturedContext.question).toBe('hello');
+    });
+
+    it('should persist the execution before executing nodes', async () => {
+      mockPrisma.workflow.findUnique.mockResolvedValue(
+        buildWorkflow([{ id: 'llm', type: 'llm', data: {} }], []),
+      );
+
+      mockExecutor.execute.mockImplementation(async () => {
+        expect(mockPrisma.workflowExecution.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            id: 'exec_1',
+            workflowId: 'wf_1',
+            status: 'running',
+          }),
+        });
+        return { result: 'ok' };
+      });
+
+      await service.executeWorkflow('wf_1', { inputs: {} }, undefined, 'exec_1');
     });
   });
 

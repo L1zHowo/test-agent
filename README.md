@@ -44,7 +44,7 @@ Prisma Schema 的向量列固定为 `vector(1024)`，与 Qwen `text-embedding-v3
 - 支持通过 stdio + JSON-RPC 2.0 管理和调用 MCP Server。
 - 支持注册登录、JWT、数据按用户隔离、角色和团队权限。
 - 支持团队、成员、团队应用、公开分享、嵌入配置和 API Key。
-- 支持 Token/费用统计、工作流 Trace、节点 Span、慢调用和健康检查。
+- 支持 Token/费用统计、工作流执行记录和健康检查。
 
 MCP Server 由后端作为子进程运行。使用 Docker 时，对应命令和依赖也必须存在于后端容器中。
 

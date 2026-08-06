@@ -14,9 +14,6 @@ import TeamDetail from '../pages/TeamDetail'
 import ApiKeyManagement from '../pages/ApiKeyManagement'
 import SharedApp from '../pages/SharedApp'
 import CostStatistics from '../pages/CostStatistics'
-import RateLimitMonitor from '../pages/RateLimitMonitor'
-import TraceList from '../pages/TraceList'
-import TraceDetail from '../pages/TraceDetail'
 import { useStore } from '../store'
 
 // 鉴权守卫
@@ -53,9 +50,6 @@ export const router = createBrowserRouter(
         <Route path="/teams/:teamId" element={<TeamDetail />} />
         <Route path="/api-keys" element={<ApiKeyManagement />} />
         <Route path="/cost-statistics" element={<CostStatistics />} />
-        <Route path="/rate-limit" element={<RateLimitMonitor />} />
-        <Route path="/trace-list" element={<TraceList />} />
-        <Route path="/trace-detail" element={<TraceDetail />} />
       </Route>
       
       {/* 404路由 */}
