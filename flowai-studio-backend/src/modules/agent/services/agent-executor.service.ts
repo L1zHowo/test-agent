@@ -27,6 +27,7 @@ import {
   ToolResult,
   AgentTraceEntry,
   AgentExecutionResult,
+  AgentTerminationReason,
   AgentRunOptions,
   ToolDefinition,
 } from '../interfaces/agent.interface';
@@ -90,6 +91,7 @@ export class AgentExecutorService {
         iterations: 0,
         duration: Date.now() - startTime,
         success: false,
+        terminationReason: 'error',
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
@@ -116,6 +118,8 @@ export class AgentExecutorService {
   ): Promise<AgentExecutionResult> {
     const agentConfig = config.singleAgent!;
     const maxIterations = options?.maxIterations ?? config.maxIterations ?? 10;
+    const seenToolCalls = new Set<string>();
+    let terminationReason: AgentTerminationReason = 'completed';
 
     // 初始化状态
     const state: AgentState = {
@@ -124,7 +128,9 @@ export class AgentExecutorService {
       messages: [
         {
           role: 'system',
-          content: agentConfig.systemPrompt || '你是一个智能助手，可以使用工具来帮助用户解决问题。',
+          content:
+            agentConfig.systemPrompt ||
+            '你是一个智能助手，可以使用工具来帮助用户解决问题。',
           agentId: agentConfig.id,
           timestamp: Date.now(),
         },
@@ -152,10 +158,12 @@ export class AgentExecutorService {
     }
 
     // 获取对应模型的 Provider
-    const provider = this.providerFactory.getProviderForModel(agentConfig.model);
+    const provider = this.providerFactory.getProviderForModel(
+      agentConfig.model,
+    );
 
     // ReAct 循环
-    while (state.iteration < maxIterations && !state.finished) {
+    executionLoop: while (state.iteration < maxIterations && !state.finished) {
       state.iteration++;
 
       this.pushTrace(state, {
@@ -200,6 +208,20 @@ export class AgentExecutorService {
 
         // 逐个执行工具
         for (const toolCall of llmResponse.toolCalls) {
+          const signature = this.createToolCallSignature(toolCall);
+          if (seenToolCalls.has(signature)) {
+            terminationReason = 'repeated_tool_call';
+            state.output =
+              this.getLastAssistantMessage(state) ||
+              '检测到重复工具调用，已停止执行。';
+            this.pushSSE(options, {
+              type: 'agent_stopped',
+              data: { reason: terminationReason, message: state.output },
+            });
+            state.finished = true;
+            break executionLoop;
+          }
+          seenToolCalls.add(signature);
           const toolResult = await this.executeToolCall(
             toolCall,
             toolMap,
@@ -273,11 +295,12 @@ export class AgentExecutorService {
       }
     }
 
-    // 达到最大迭代次数但未完成
+    // 循环结束但没有正常得到最终答案
     if (!state.finished) {
-      state.output = state.messages
-        .filter((m) => m.role === 'assistant' && m.content)
-        .pop()?.content || 'Agent 达到最大迭代次数，未能完成任务。';
+      terminationReason = 'max_iterations';
+      state.output =
+        this.getLastAssistantMessage(state) ||
+        'Agent 达到最大迭代次数，未能完成任务。';
 
       this.pushTrace(state, {
         type: 'error',
@@ -295,7 +318,8 @@ export class AgentExecutorService {
       ragCallCount: state.ragResults.length,
       iterations: state.iteration,
       duration: 0, // 由 execute() 设置
-      success: true,
+      success: terminationReason === 'completed',
+      terminationReason,
     };
   }
 
@@ -320,6 +344,8 @@ export class AgentExecutorService {
   ): Promise<AgentExecutionResult> {
     const supervisorConfig = config.supervisor!;
     const maxIterations = options?.maxIterations ?? config.maxIterations ?? 15;
+    const seenDelegations = new Set<string>();
+    let terminationReason: AgentTerminationReason = 'completed';
 
     // 初始化状态
     const state: AgentState = {
@@ -345,11 +371,14 @@ export class AgentExecutorService {
     };
 
     // 预加载所有 Worker 的工具
-    const workerToolMaps = new Map<string, {
-      tools: ToolDefinition[];
-      toolMap: Map<string, { id: string; name: string }>;
-      config: WorkerAgentConfig;
-    }>();
+    const workerToolMaps = new Map<
+      string,
+      {
+        tools: ToolDefinition[];
+        toolMap: Map<string, { id: string; name: string }>;
+        config: WorkerAgentConfig;
+      }
+    >();
 
     for (const worker of supervisorConfig.workers) {
       const tools = await this.loadTools(worker.toolIds);
@@ -398,10 +427,12 @@ export class AgentExecutorService {
     });
 
     // 获取 Supervisor 模型的 Provider
-    const supervisorProvider = this.providerFactory.getProviderForModel(supervisorConfig.model);
+    const supervisorProvider = this.providerFactory.getProviderForModel(
+      supervisorConfig.model,
+    );
 
     // ReAct 循环（Supervisor 视角）
-    while (state.iteration < maxIterations && !state.finished) {
+    executionLoop: while (state.iteration < maxIterations && !state.finished) {
       state.iteration++;
 
       this.pushTrace(state, {
@@ -445,7 +476,8 @@ export class AgentExecutorService {
 
         if (toolCall.name === 'finish') {
           // Supervisor 给出最终答案
-          state.output = toolCall.arguments.answer || supervisorResponse.content || '';
+          state.output =
+            toolCall.arguments.answer || supervisorResponse.content || '';
           state.finished = true;
 
           this.pushTrace(state, {
@@ -460,7 +492,25 @@ export class AgentExecutorService {
           });
         } else {
           // 委派给 Worker
-          const workerId = this.extractWorkerId(toolCall.name, supervisorConfig.workers);
+          const signature = this.createToolCallSignature(toolCall);
+          if (seenDelegations.has(signature)) {
+            terminationReason = 'repeated_tool_call';
+            state.output =
+              this.getLastAssistantMessage(state) ||
+              '检测到重复的 Worker 委派，已停止执行。';
+            this.pushSSE(options, {
+              type: 'agent_stopped',
+              data: { reason: terminationReason, message: state.output },
+            });
+            state.finished = true;
+            break executionLoop;
+          }
+          seenDelegations.add(signature);
+
+          const workerId = this.extractWorkerId(
+            toolCall.name,
+            supervisorConfig.workers,
+          );
           const workerInfo = workerToolMaps.get(workerId);
 
           if (workerInfo) {
@@ -542,12 +592,11 @@ export class AgentExecutorService {
       }
     }
 
-    // 达到最大迭代次数
     if (!state.finished) {
-      const lastAssistantMsg = state.messages
-        .filter((m) => m.role === 'supervisor' && m.content)
-        .pop();
-      state.output = lastAssistantMsg?.content || 'Supervisor 达到最大迭代次数，未能完成任务。';
+      terminationReason = 'max_iterations';
+      state.output =
+        this.getLastAssistantMessage(state) ||
+        'Supervisor 达到最大迭代次数，未能完成任务。';
 
       this.pushTrace(state, {
         type: 'error',
@@ -564,7 +613,8 @@ export class AgentExecutorService {
       ragCallCount: state.ragResults.length,
       iterations: state.iteration,
       duration: 0,
-      success: true,
+      success: terminationReason === 'completed',
+      terminationReason,
     };
   }
 
@@ -581,6 +631,8 @@ export class AgentExecutorService {
     options?: AgentRunOptions,
   ): Promise<AgentExecutionResult> {
     const maxIterations = 5; // Worker 最多 5 轮迭代
+    const seenToolCalls = new Set<string>();
+    let terminationReason: AgentTerminationReason = 'completed';
 
     const state: AgentState = {
       input: task,
@@ -588,7 +640,9 @@ export class AgentExecutorService {
       messages: [
         {
           role: 'system',
-          content: workerConfig.systemPrompt || `你是一个专业助手，负责完成特定类型的任务。请根据任务描述，使用可用工具完成任务，并返回结果。`,
+          content:
+            workerConfig.systemPrompt ||
+            `你是一个专业助手，负责完成特定类型的任务。请根据任务描述，使用可用工具完成任务，并返回结果。`,
           agentId: workerConfig.id,
           timestamp: Date.now(),
         },
@@ -611,10 +665,12 @@ export class AgentExecutorService {
     }
 
     // 获取 Worker 模型的 Provider
-    const provider = this.providerFactory.getProviderForModel(workerConfig.model);
+    const provider = this.providerFactory.getProviderForModel(
+      workerConfig.model,
+    );
 
     // ReAct 循环
-    while (state.iteration < maxIterations && !state.finished) {
+    executionLoop: while (state.iteration < maxIterations && !state.finished) {
       state.iteration++;
 
       const llmResponse = await provider.chat({
@@ -638,6 +694,20 @@ export class AgentExecutorService {
         });
 
         for (const toolCall of llmResponse.toolCalls) {
+          const signature = this.createToolCallSignature(toolCall);
+          if (seenToolCalls.has(signature)) {
+            terminationReason = 'repeated_tool_call';
+            state.output =
+              this.getLastAssistantMessage(state) ||
+              '检测到重复工具调用，已停止执行。';
+            this.pushSSE(options, {
+              type: 'agent_stopped',
+              data: { reason: terminationReason, message: state.output },
+            });
+            state.finished = true;
+            break executionLoop;
+          }
+          seenToolCalls.add(signature);
           const toolResult = await this.executeToolCall(
             toolCall,
             toolMap,
@@ -666,10 +736,9 @@ export class AgentExecutorService {
     }
 
     if (!state.finished) {
+      terminationReason = 'max_iterations';
       state.output =
-        state.messages
-          .filter((m) => m.role === 'assistant' && m.content)
-          .pop()?.content || 'Worker 未能完成任务。';
+        this.getLastAssistantMessage(state) || 'Worker 未能完成任务。';
     }
 
     return {
@@ -680,12 +749,48 @@ export class AgentExecutorService {
       ragCallCount: state.ragResults.length,
       iterations: state.iteration,
       duration: 0,
-      success: true,
+      success: terminationReason === 'completed',
+      terminationReason,
     };
   }
 
   // ============================================================
-  // 工具管理
+  private getLastAssistantMessage(state: AgentState): string {
+    return (
+      state.messages
+        .filter(
+          (message) =>
+            (message.role === 'assistant' || message.role === 'supervisor') &&
+            message.content,
+        )
+        .pop()?.content || ''
+    );
+  }
+
+  private createToolCallSignature(toolCall: ToolCall): string {
+    return JSON.stringify({
+      name: toolCall.name,
+      arguments: this.sortForSignature(toolCall.arguments),
+    });
+  }
+
+  private sortForSignature(value: any): any {
+    if (Array.isArray(value))
+      return value.map((item) => this.sortForSignature(item));
+    if (value && typeof value === 'object') {
+      return Object.keys(value)
+        .sort()
+        .reduce(
+          (result, key) => {
+            result[key] = this.sortForSignature(value[key]);
+            return result;
+          },
+          {} as Record<string, any>,
+        );
+    }
+    return value;
+  }
+
   // ============================================================
 
   /**
@@ -693,7 +798,9 @@ export class AgentExecutorService {
    */
   private async loadTools(
     toolIds: string[],
-  ): Promise<Array<{ id: string; name: string; description: string; inputSchema: any }>> {
+  ): Promise<
+    Array<{ id: string; name: string; description: string; inputSchema: any }>
+  > {
     if (!toolIds || toolIds.length === 0) {
       // 如果没有指定工具，加载所有内置工具
       const builtinSkills = await this.skillService.getBuiltinSkills();
@@ -748,7 +855,10 @@ export class AgentExecutorService {
     const map = new Map<string, { id: string; name: string }>();
     for (const tool of tools) {
       // 使用处理后的名称作为 key（去除特殊字符）
-      const sanitizedName = tool.name.replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+      const sanitizedName = tool.name
+        .replace(/[^a-zA-Z0-9_]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
       map.set(sanitizedName, { id: tool.id, name: tool.name });
     }
     return map;
@@ -758,7 +868,12 @@ export class AgentExecutorService {
    * 构建工具定义（通过 Provider）
    */
   private buildToolDefinitions(
-    tools: Array<{ id: string; name: string; description: string; inputSchema: any }>,
+    tools: Array<{
+      id: string;
+      name: string;
+      description: string;
+      inputSchema: any;
+    }>,
   ): ToolDefinition[] {
     // 使用 Qwen Provider 的 buildToolDefinitions 作为默认（OpenAI 兼容格式）
     // 因为所有 Provider 都兼容此格式或内部转换
@@ -788,7 +903,10 @@ export class AgentExecutorService {
 
     try {
       // 替换参数中的上下文变量
-      const resolvedArgs = this.resolveVariables(toolCall.arguments, context || {});
+      const resolvedArgs = this.resolveVariables(
+        toolCall.arguments,
+        context || {},
+      );
 
       const result = await this.skillService.executeSkill(
         toolInfo.id,
@@ -805,7 +923,9 @@ export class AgentExecutorService {
       return {
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        result: { error: error instanceof Error ? error.message : 'Unknown error' },
+        result: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
@@ -840,9 +960,7 @@ export class AgentExecutorService {
 
         // 将 RAG 结果注入系统消息
         if (documents.length > 0) {
-          const ragContext = documents
-            .map((d) => d.content)
-            .join('\n\n');
+          const ragContext = documents.map((d) => d.content).join('\n\n');
 
           // 更新系统提示词
           const systemMsg = state.messages.find((m) => m.role === 'system');
@@ -871,9 +989,10 @@ export class AgentExecutorService {
   /**
    * 构建 Supervisor 系统提示词
    */
-  private buildSupervisorSystemPrompt(
-    config: { systemPrompt: string; workers: WorkerAgentConfig[] },
-  ): string {
+  private buildSupervisorSystemPrompt(config: {
+    systemPrompt: string;
+    workers: WorkerAgentConfig[];
+  }): string {
     const workerDescriptions = config.workers
       .map(
         (w) =>

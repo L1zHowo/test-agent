@@ -44,6 +44,7 @@ export class AgentNodeExecutor implements INodeExecutor {
       iterations: result.iterations,
       duration: result.duration,
       success: result.success,
+      terminationReason: result.terminationReason,
     };
   }
 

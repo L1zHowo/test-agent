@@ -15,10 +15,7 @@ import { AgentExecutorService } from '../services/agent-executor.service';
 import { LLMProviderFactory } from '../providers/llm-provider.factory';
 import { SkillService } from '../../skill/services/skill.service';
 import { RAGService } from '../../rag/services/rag.service';
-import {
-  AgentNodeConfig,
-  LLMResponse,
-} from '../interfaces/agent.interface';
+import { AgentNodeConfig, LLMResponse } from '../interfaces/agent.interface';
 
 describe('AgentExecutorService', () => {
   let agentExecutor: AgentExecutorService;
@@ -52,7 +49,15 @@ describe('AgentExecutorService', () => {
     // Mock SkillService
     mockSkillService = {
       getBuiltinSkills: jest.fn().mockResolvedValue([
-        { type: 'calculator', name: '计算器', description: '计算数学表达式', inputSchema: { type: 'object', properties: { expression: { type: 'string' } } } },
+        {
+          type: 'calculator',
+          name: '计算器',
+          description: '计算数学表达式',
+          inputSchema: {
+            type: 'object',
+            properties: { expression: { type: 'string' } },
+          },
+        },
       ]),
       findSkillById: jest.fn(),
       executeSkill: jest.fn(),
@@ -114,7 +119,9 @@ describe('AgentExecutorService', () => {
       expect(result.success).toBe(true);
       expect(result.result).toBe('这是最终答案');
       expect(result.iterations).toBe(1);
-      expect(mockProviderFactory.getProviderForModel).toHaveBeenCalledWith('qwen-turbo');
+      expect(mockProviderFactory.getProviderForModel).toHaveBeenCalledWith(
+        'qwen-turbo',
+      );
     });
 
     it('should execute tool calls and return final answer', async () => {
@@ -141,12 +148,20 @@ describe('AgentExecutorService', () => {
     });
 
     it('should stop at max iterations', async () => {
-      mockProvider.chat.mockResolvedValue({
-        content: '',
-        toolCalls: [
-          { id: 'call_1', name: '___', arguments: { expression: 'loop' } },
-        ],
-      });
+      mockProvider.chat.mockImplementation(() =>
+        Promise.resolve({
+          content: '',
+          toolCalls: [
+            {
+              id: 'call_loop',
+              name: '___',
+              arguments: {
+                expression: 'loop_' + mockProvider.chat.mock.calls.length,
+              },
+            },
+          ],
+        }),
+      );
 
       const limitedConfig = { ...singleConfig, maxIterations: 3 };
       mockSkillService.executeSkill.mockResolvedValue({ result: 'looping' });
@@ -154,9 +169,40 @@ describe('AgentExecutorService', () => {
       const result = await agentExecutor.execute(limitedConfig, '无限循环');
 
       expect(result.iterations).toBe(3);
-      expect(result.success).toBe(true); // 不会报错，只是达到上限
+      expect(result.success).toBe(false);
+      expect(result.terminationReason).toBe('max_iterations');
     });
 
+    it('should stop repeated tool calls with an explicit reason', async () => {
+      mockSkillService.getBuiltinSkills.mockResolvedValueOnce([
+        {
+          type: 'calculator',
+          name: 'calculator',
+          description: 'calculator',
+          inputSchema: { type: 'object' },
+        },
+      ]);
+      mockProvider.chat.mockResolvedValue({
+        content: '',
+        toolCalls: [
+          {
+            id: 'loop_call',
+            name: 'calculator',
+            arguments: { expression: 'same' },
+          },
+        ],
+      });
+      mockSkillService.executeSkill.mockResolvedValue({
+        result: 'same result',
+      });
+
+      const result = await agentExecutor.execute(singleConfig, '重复调用');
+
+      expect(result.success).toBe(false);
+      expect(result.terminationReason).toBe('repeated_tool_call');
+      expect(result.iterations).toBe(2);
+      expect(mockSkillService.executeSkill).toHaveBeenCalledTimes(1);
+    });
     it('should produce execution trace', async () => {
       mockProvider.chat.mockResolvedValue({
         content: '答案',
@@ -167,7 +213,9 @@ describe('AgentExecutorService', () => {
 
       expect(result.trace.length).toBeGreaterThan(0);
       expect(result.trace.some((t: any) => t.type === 'thinking')).toBe(true);
-      expect(result.trace.some((t: any) => t.type === 'final_answer')).toBe(true);
+      expect(result.trace.some((t: any) => t.type === 'final_answer')).toBe(
+        true,
+      );
     });
   });
 
@@ -209,7 +257,11 @@ describe('AgentExecutorService', () => {
       mockProvider.chat.mockResolvedValueOnce({
         content: '',
         toolCalls: [
-          { id: 'call_1', name: 'delegate_to_worker_1', arguments: { task: '搜索信息' } },
+          {
+            id: 'call_1',
+            name: 'delegate_to_worker_1',
+            arguments: { task: '搜索信息' },
+          },
         ],
       });
       // Worker 返回答案
@@ -271,7 +323,11 @@ describe('AgentExecutorService', () => {
       const result = await agentExecutor.execute(ragConfig, '查询知识');
 
       expect(result.ragCallCount).toBe(1);
-      expect(mockRAGService.retrieve).toHaveBeenCalledWith('查询知识', 'kb_001', 5);
+      expect(mockRAGService.retrieve).toHaveBeenCalledWith(
+        '查询知识',
+        'kb_001',
+        5,
+      );
     });
 
     it('should handle RAG retrieval failure gracefully', async () => {
@@ -284,7 +340,10 @@ describe('AgentExecutorService', () => {
 
       const failConfig = {
         ...ragConfig,
-        singleAgent: { ...ragConfig.singleAgent!, knowledgeBaseIds: ['kb_404'] },
+        singleAgent: {
+          ...ragConfig.singleAgent!,
+          knowledgeBaseIds: ['kb_404'],
+        },
       };
 
       const result = await agentExecutor.execute(failConfig, '查询');
@@ -336,7 +395,9 @@ describe('AgentExecutorService', () => {
         ],
       });
 
-      mockSkillService.executeSkill.mockRejectedValue(new Error('工具执行失败'));
+      mockSkillService.executeSkill.mockRejectedValue(
+        new Error('工具执行失败'),
+      );
 
       mockProvider.chat.mockResolvedValueOnce({
         content: '工具调用失败了',
@@ -409,7 +470,9 @@ describe('AgentExecutorService', () => {
 
       const result = await agentExecutor.execute(config, '你好');
 
-      expect(mockProviderFactory.getProviderForModel).toHaveBeenCalledWith('qwen-plus');
+      expect(mockProviderFactory.getProviderForModel).toHaveBeenCalledWith(
+        'qwen-plus',
+      );
       expect(qwenProvider.chat).toHaveBeenCalled();
       expect(result.success).toBe(true);
     });

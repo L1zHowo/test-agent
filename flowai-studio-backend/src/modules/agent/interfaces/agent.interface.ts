@@ -158,7 +158,15 @@ export interface RAGResult {
 /** Agent 执行轨迹条目 */
 export interface AgentTraceEntry {
   /** 步骤类型 */
-  type: 'thinking' | 'tool_call' | 'tool_result' | 'rag_retrieve' | 'worker_delegate' | 'worker_result' | 'final_answer' | 'error';
+  type:
+    | 'thinking'
+    | 'tool_call'
+    | 'tool_result'
+    | 'rag_retrieve'
+    | 'worker_delegate'
+    | 'worker_result'
+    | 'final_answer'
+    | 'error';
   /** 步骤描述 */
   content: string;
   /** 关联的 Agent ID */
@@ -174,6 +182,12 @@ export interface AgentTraceEntry {
 // ============================================================
 
 /** Agent 执行结果 */
+export type AgentTerminationReason =
+  | 'completed'
+  | 'max_iterations'
+  | 'repeated_tool_call'
+  | 'error';
+
 export interface AgentExecutionResult {
   /** 最终输出 */
   result: string;
@@ -191,6 +205,8 @@ export interface AgentExecutionResult {
   duration: number;
   /** 是否成功 */
   success: boolean;
+  /** Agent 停止原因 */
+  terminationReason: AgentTerminationReason;
   /** 错误信息 */
   error?: string;
 }
