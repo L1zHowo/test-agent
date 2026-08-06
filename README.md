@@ -50,16 +50,16 @@ MCP Server 由后端作为子进程运行。使用 Docker 时，对应命令和�
 
 ## 技术栈
 
-| 部分 | 技术 |
-| --- | --- |
-| 前端 | React 18、TypeScript、Vite、Ant Design、React Flow、Zustand |
-| 后端 | NestJS、TypeScript、Prisma、JWT、class-validator、SSE |
-| 数据库 | PostgreSQL 16 + pgvector |
-| 缓存 | Redis 7 |
-| 文档处理 | pdf-parse、mammoth |
-| 部署 | Docker Compose、Nginx |
 
-仓库有两个独立 Node.js 工程，但没有根级 Workspace 配置，因此是同仓库多项目结构，不是 npm/pnpm Workspace 意义上的 Monorepo。
+| 部分   | 技术                                                     |
+| ---- | ------------------------------------------------------ |
+| 前端   | React 18、TypeScript、Vite、Ant Design、React Flow、Zustand |
+| 后端   | NestJS、TypeScript、Prisma、JWT、class-validator、SSE       |
+| 数据库  | PostgreSQL 16 + pgvector                               |
+| 缓存   | Redis 7                                                |
+| 文档处理 | pdf-parse、mammoth                                      |
+| 部署   | Docker Compose、Nginx                                   |
+
 
 ## 项目结构
 
@@ -74,6 +74,8 @@ MCP Server 由后端作为子进程运行。使用 Docker 时，对应命令和�
     `-- src/                 # 页面、组件、路由、状态和 API 封装
 ```
 
+
+
 ## 环境要求
 
 - Node.js 20 推荐，至少 Node.js 18。
@@ -81,6 +83,8 @@ MCP Server 由后端作为子进程运行。使用 Docker 时，对应命令和�
 - PostgreSQL，并启用 pgvector。
 - Redis。
 - 至少一个可用的大模型和 Embedding 服务。
+
+
 
 ## 后端环境变量
 
@@ -109,7 +113,6 @@ MAX_FILE_SIZE=10485760
 
 不要提交真实的 `.env`、JWT Secret 或 API Key。根目录 `.gitignore` 已忽略所有 `.env` 文件。
 
-
 ## 本地开发启动
 
 推荐用 Docker 运行 PostgreSQL 和 Redis，在本机运行前后端。
@@ -125,6 +128,8 @@ docker compose up -d postgres redis
 ```powershell
 docker exec -it flowai-postgres psql -U postgres -d flowai_studio -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
+
+
 
 ### 2. 初始化并启动后端
 
@@ -147,6 +152,8 @@ cmd /c npx prisma db push
 cmd /c npx prisma db seed
 cmd /c npm run start:dev
 ```
+
+
 
 ### 3. 启动前端
 
@@ -210,6 +217,8 @@ npm run build
 npm run lint
 ```
 
+
+
 ## 当前限制
 
 - LLM 和 Embedding 都只使用 Qwen。
@@ -217,3 +226,4 @@ npm run lint
 - 向量存储只支持 pgvector，并与主 PostgreSQL 数据库共用同一套服务。
 - MCP 在容器中需要额外安装对应命令。
 - 自定义 HTTP 和代码工具权限较高，生产环境应增加网络控制、审计和更严格的沙箱。
+
