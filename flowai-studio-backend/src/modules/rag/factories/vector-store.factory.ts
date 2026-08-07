@@ -11,7 +11,6 @@
  *
  * 竞品对标:
  * - Dify: 配置文件选择向量存储类型
- * - LangChain: 通过类继承体系
  * - 本设计: 通过工厂模式 + 接口，更灵活且类型安全
  */
 import { Injectable, Logger } from '@nestjs/common';

@@ -22,7 +22,6 @@
  * - Dify: RRF 融合，k=60，支持调整向量/关键词权重
  * - FastGPT: 自定义权重融合（score_vector * w1 + score_keyword * w2）
  * - Coze: 仅向量检索
- * - LangChain: EnsembleRetriever 使用 RRF 融合
  *
  * 本设计优势:
  * - 标准 RRF 算法（学术界验证）

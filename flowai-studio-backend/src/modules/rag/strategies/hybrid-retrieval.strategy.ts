@@ -14,7 +14,6 @@
  * - FastGPT: hybrid 使用自定义权重融合
  * - Coze: 仅向量检索
  * - Flowise: EnsembleRetriever 使用 RRF
- * - LangChain: EnsembleRetriever + RRF
  *
  * 本设计优势:
  * - 标准 RRF 算法（学术验证，无需调参）

@@ -16,7 +16,6 @@
  * - FastGPT: MongoDB Atlas Full-Text Search
  * - Coze: 内置全文搜索
  * - Flowise: Pinecone + BM25 本地实现
- * - LangChain: BM25 (js) 纯内存实现
  *
  * 本设计优势:
  * - 零额外部署（PostgreSQL 原生全文搜索）

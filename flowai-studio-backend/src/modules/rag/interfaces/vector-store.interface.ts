@@ -10,7 +10,6 @@
  * - Dify: 通过统一接口管理向量存储
  * - FastGPT: MongoDB Atlas Vector Search
  * - n8n: 无内置向量存储
- * - LangChain: 抽象 VectorStore 接口 + 30+ 实现
  *
  * 本设计优势:
  * - 统一的 upsert / search / delete 接口

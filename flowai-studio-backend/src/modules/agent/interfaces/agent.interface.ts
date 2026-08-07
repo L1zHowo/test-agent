@@ -1,7 +1,7 @@
 /**
  * Agent 模块核心接口定义
  *
- * Phase 3.1: LangGraph.js 集成 — 多智能体架构
+ * Phase 3.1: 多智能体架构
  *
  * 设计理念:
  * - Supervisor/Worker 模式: Supervisor Agent 负责任务分配和协调
@@ -11,7 +11,6 @@
  * - 支持多轮对话和记忆
  */
 
-import { RunnableConfig } from '@langchain/core/runnables';
 
 // ============================================================
 // Agent 配置
@@ -83,7 +82,7 @@ export interface AgentNodeConfig {
 // Agent 状态
 // ============================================================
 
-/** Agent 运行时状态 (LangGraph State) */
+/** Agent 运行时状态 */
 export interface AgentState {
   /** 用户输入 */
   input: string;
