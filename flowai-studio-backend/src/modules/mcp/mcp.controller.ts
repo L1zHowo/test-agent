@@ -26,11 +26,10 @@ export class McpController {
     @Body() body: {
       name: string;
       description?: string;
-      transportType?: 'stdio' | 'sse';
+      transportType?: 'stdio';
       command?: string;
       args?: string[];
       env?: Record<string, string>;
-      url?: string;
     },
   ) {
     return this.mcpService.create(userId, body);
@@ -59,11 +58,10 @@ export class McpController {
     @Body() body: {
       name?: string;
       description?: string;
-      transportType?: 'stdio' | 'sse';
+      transportType?: 'stdio';
       command?: string;
       args?: string[];
       env?: Record<string, string>;
-      url?: string;
       isActive?: boolean;
     },
   ) {

@@ -203,6 +203,31 @@ describe('CacheService', () => {
       expect(factory).toHaveBeenCalledTimes(1);
     });
 
+    it('should treat cached null sentinel as a cache hit', async () => {
+      mockRedisService.getCached.mockResolvedValue({ __flowAiCacheNull: true });
+
+      const factory = jest.fn().mockResolvedValue('from-factory');
+      const result = await cacheService.getOrSet('null-sentinel-test', factory, 300);
+
+      expect(result).toBeNull();
+      expect(factory).not.toHaveBeenCalled();
+    });
+
+    it('should use the null-value TTL when caching nullish values', async () => {
+      mockRedisService.getCached.mockResolvedValue(null);
+
+      await cacheService.getOrSet('null-ttl-test', jest.fn().mockResolvedValue(null), 300);
+
+      expect(mockRedisService.setCached).toHaveBeenCalledWith(
+        'cache:null-ttl-test',
+        { __flowAiCacheNull: true },
+        expect.any(Number),
+      );
+      const ttl = mockRedisService.setCached.mock.calls.at(-1)[2];
+      expect(ttl).toBeGreaterThanOrEqual(27);
+      expect(ttl).toBeLessThanOrEqual(33);
+    });
+
     it('should degrade gracefully when Redis fails', async () => {
       mockRedisService.getCached.mockRejectedValue(new Error('Redis down'));
       mockRedisService.setCached.mockRejectedValue(new Error('Redis down'));

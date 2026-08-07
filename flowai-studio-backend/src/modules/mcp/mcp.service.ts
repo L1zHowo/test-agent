@@ -8,22 +8,33 @@ import { McpClient, McpTool, McpToolResult } from './mcp-client';
 export interface CreateMcpServerDto {
   name: string;
   description?: string;
-  transportType?: 'stdio' | 'sse';
+  transportType?: 'stdio';
   command?: string;
   args?: string[];
   env?: Record<string, string>;
-  url?: string;
 }
 
 export interface UpdateMcpServerDto {
   name?: string;
   description?: string;
-  transportType?: 'stdio' | 'sse';
+  transportType?: 'stdio';
   command?: string;
   args?: string[];
   env?: Record<string, string>;
-  url?: string;
   isActive?: boolean;
+}
+
+export interface McpRuntimeTool extends McpTool {
+  id: string;
+  source: 'mcp';
+  serverId: string;
+  serverName: string;
+}
+
+export interface McpToolRef {
+  source: 'mcp';
+  serverId: string;
+  toolName: string;
 }
 
 @Injectable()
@@ -38,11 +49,11 @@ export class McpService {
   // ========== CRUD ==========
 
   async create(userId: string, dto: CreateMcpServerDto) {
-    if (dto.transportType === 'stdio' && !dto.command) {
-      throw new BadRequestException('stdio 模式必须提供启动命令 (command)');
+    if (dto.transportType && dto.transportType !== 'stdio') {
+      throw new BadRequestException('当前仅支持 stdio 传输方式');
     }
-    if (dto.transportType === 'sse' && !dto.url) {
-      throw new BadRequestException('SSE 模式必须提供服务器 URL');
+    if (!dto.command) {
+      throw new BadRequestException('stdio 模式必须提供启动命令 (command)');
     }
 
     return this.prisma.mcpServer.create({
@@ -53,7 +64,6 @@ export class McpService {
         command: dto.command,
         args: dto.args ? JSON.stringify(dto.args) : null,
         env: dto.env ? JSON.stringify(dto.env) : null,
-        url: dto.url,
         userId,
       },
     });
@@ -89,6 +99,9 @@ export class McpService {
 
   async update(userId: string, id: string, dto: UpdateMcpServerDto) {
     await this.findOne(userId, id);
+    if (dto.transportType && dto.transportType !== 'stdio') {
+      throw new BadRequestException('当前仅支持 stdio 传输方式');
+    }
 
     // 如果正在连接，先断开
     if (this.clients.has(id)) {
@@ -216,9 +229,9 @@ export class McpService {
   /**
    * 获取所有已连接服务器的所有工具（聚合）
    */
-  async listAllTools(userId: string): Promise<Array<McpTool & { serverId: string; serverName: string }>> {
+  async listAllTools(userId: string): Promise<Array<McpRuntimeTool>> {
     const servers = await this.findAll(userId);
-    const allTools: Array<McpTool & { serverId: string; serverName: string }> = [];
+    const allTools: Array<McpRuntimeTool> = [];
 
     for (const server of servers) {
       const client = this.clients.get(server.id);
@@ -226,7 +239,13 @@ export class McpService {
         try {
           const tools = await client.listTools();
           for (const tool of tools) {
-            allTools.push({ ...tool, serverId: server.id, serverName: server.name });
+            allTools.push({
+              ...tool,
+              id: this.createToolId(server.id, tool.name),
+              source: 'mcp',
+              serverId: server.id,
+              serverName: server.name,
+            });
           }
         } catch {
           // 跳过出错的服务器
@@ -235,6 +254,55 @@ export class McpService {
     }
 
     return allTools;
+  }
+
+  isMcpToolId(toolId: string): boolean {
+    return toolId.startsWith('mcp:');
+  }
+
+  createToolId(serverId: string, toolName: string): string {
+    return `mcp:${serverId}:${encodeURIComponent(toolName)}`;
+  }
+
+  parseToolId(toolId: string): McpToolRef {
+    const parts = toolId.split(':');
+    if (parts.length < 3 || parts[0] !== 'mcp') {
+      throw new BadRequestException('Invalid MCP tool id');
+    }
+
+    return {
+      source: 'mcp',
+      serverId: parts[1],
+      toolName: decodeURIComponent(parts.slice(2).join(':')),
+    };
+  }
+
+  async findRuntimeTool(userId: string, toolId: string): Promise<McpRuntimeTool> {
+    const { serverId, toolName } = this.parseToolId(toolId);
+    const server = await this.findOne(userId, serverId);
+    const tools = await this.listTools(userId, serverId);
+    const tool = tools.find((item) => item.name === toolName);
+
+    if (!tool) {
+      throw new NotFoundException('MCP tool not found');
+    }
+
+    return {
+      ...tool,
+      id: toolId,
+      source: 'mcp',
+      serverId,
+      serverName: server.name,
+    };
+  }
+
+  async callToolById(
+    userId: string,
+    toolId: string,
+    args: Record<string, any> = {},
+  ): Promise<McpToolResult> {
+    const { serverId, toolName } = this.parseToolId(toolId);
+    return this.callTool(userId, serverId, toolName, args);
   }
 
   /**

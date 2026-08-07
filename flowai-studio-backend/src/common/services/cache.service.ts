@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { RedisService } from './redis.service';
 
 export interface CacheStats {
@@ -27,6 +27,14 @@ export interface MultiLevelCacheConfig {
 type MemoryEntry<T = unknown> = {
   value: T;
   expiresAt: number;
+};
+
+type NullCacheSentinel = {
+  __flowAiCacheNull: true;
+};
+
+const NULL_CACHE_SENTINEL: NullCacheSentinel = {
+  __flowAiCacheNull: true,
 };
 
 @Injectable()
@@ -77,8 +85,8 @@ export class CacheService implements OnModuleDestroy {
   }
 
   async getOrSet<T>(key: string, factory: () => Promise<T>, ttlSeconds?: number): Promise<T> {
-    const cached = await this.get<T>(key);
-    if (cached !== null) return cached;
+    const cached = await this.getEntry<T>(key);
+    if (cached.hit) return cached.value as T;
 
     const fullKey = this.buildKey(key);
     const existingLock = this.locks.get(fullKey) as Promise<T> | undefined;
@@ -105,24 +113,35 @@ export class CacheService implements OnModuleDestroy {
   }
 
   async get<T>(key: string): Promise<T | null> {
+    const entry = await this.getEntry<T>(key);
+    return entry.hit ? entry.value : null;
+  }
+
+  private async getEntry<T>(key: string): Promise<{ hit: true; value: T | null } | { hit: false }> {
     const fullKey = this.buildKey(key);
 
     if (this.config.l1Enabled) {
-      const memoryValue = this.getMemory<T>(fullKey);
+      const memoryValue = this.getMemory<T | NullCacheSentinel>(fullKey);
       if (memoryValue.hit) {
         this.stats.l1Hits++;
-        return memoryValue.value;
+        return {
+          hit: true,
+          value: this.isNullSentinel(memoryValue.value) ? null : memoryValue.value,
+        };
       }
       this.stats.l1Misses++;
     }
 
     if (this.config.l2Enabled) {
       try {
-        const redisValue = await this.redisService.getCached<T>(fullKey);
+        const redisValue = await this.redisService.getCached<T | NullCacheSentinel>(fullKey);
         if (redisValue !== null) {
           this.stats.l2Hits++;
           this.setMemory(fullKey, redisValue, this.config.l1DefaultTTL);
-          return redisValue;
+          return {
+            hit: true,
+            value: this.isNullSentinel(redisValue) ? null : redisValue,
+          };
         }
         this.stats.l2Misses++;
       } catch (error) {
@@ -131,19 +150,27 @@ export class CacheService implements OnModuleDestroy {
       }
     }
 
-    return null;
+    return { hit: false };
   }
 
   async set<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
     const fullKey = this.buildKey(key);
-    const ttl = ttlSeconds ?? this.config.l2DefaultTTL;
+    const isNullish = value === null || value === undefined;
+    const ttl = isNullish
+      ? this.config.nullValueTTL
+      : ttlSeconds ?? this.config.l2DefaultTTL;
+    const cacheValue = isNullish ? NULL_CACHE_SENTINEL : value;
 
     if (this.config.l1Enabled) {
-      this.setMemory(fullKey, value, Math.min(ttl, this.config.l1DefaultTTL));
+      this.setMemory(fullKey, cacheValue, Math.min(ttl, this.config.l1DefaultTTL));
     }
 
     if (this.config.l2Enabled) {
-      await this.redisService.setCached(fullKey, value, this.applyJitterSeconds(ttl));
+      try {
+        await this.redisService.setCached(fullKey, cacheValue, this.applyJitterSeconds(ttl));
+      } catch (error) {
+        this.logger.warn(`Redis cache write failed for ${fullKey}: ${error instanceof Error ? error.message : error}`);
+      }
     }
   }
 
@@ -193,8 +220,8 @@ export class CacheService implements OnModuleDestroy {
 
   async warmUpWithFactory<T>(keys: string[], factory: (key: string) => Promise<T>, ttlSeconds?: number): Promise<void> {
     await Promise.all(keys.map(async (key) => {
-      const existing = await this.get<T>(key);
-      if (existing === null) {
+      const existing = await this.getEntry<T>(key);
+      if (!existing.hit) {
         await this.set(key, await factory(key), ttlSeconds);
       }
     }));
@@ -298,6 +325,14 @@ export class CacheService implements OnModuleDestroy {
     const jitterRange = ttlSeconds * this.config.ttlJitter;
     const jitter = (Math.random() - 0.5) * 2 * jitterRange;
     return Math.max(1, Math.round(ttlSeconds + jitter));
+  }
+
+  private isNullSentinel(value: unknown): value is NullCacheSentinel {
+    return Boolean(
+      value
+      && typeof value === 'object'
+      && (value as NullCacheSentinel).__flowAiCacheNull === true,
+    );
   }
 
   private cleanupExpired(): void {

@@ -12,18 +12,14 @@
  * - 多模型路由
  */
 import { AgentExecutorService } from '../services/agent-executor.service';
-import { LLMProviderFactory } from '../providers/llm-provider.factory';
-import { SkillService } from '../../skill/services/skill.service';
-import { RAGService } from '../../rag/services/rag.service';
-import { AgentNodeConfig, LLMResponse } from '../interfaces/agent.interface';
+import { AgentNodeConfig, ToolCall } from '../interfaces/agent.interface';
 
 describe('AgentExecutorService', () => {
   let agentExecutor: AgentExecutorService;
   let mockProviderFactory: any;
   let mockProvider: any;
-  let mockSkillService: any;
+  let mockToolRegistry: any;
   let mockRAGService: any;
-  let mockPrismaService: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -46,21 +42,42 @@ describe('AgentExecutorService', () => {
       create: jest.fn().mockReturnValue(mockProvider),
     };
 
-    // Mock SkillService
-    mockSkillService = {
-      getBuiltinSkills: jest.fn().mockResolvedValue([
-        {
-          type: 'calculator',
-          name: '计算器',
-          description: '计算数学表达式',
-          inputSchema: {
-            type: 'object',
-            properties: { expression: { type: 'string' } },
-          },
+    const calculatorTool = {
+      id: 'calculator',
+      ref: {
+        source: 'builtin',
+        id: 'calculator',
+        builtinType: 'calculator',
+      },
+      runtimeName: 'builtin_calculator',
+      aliases: ['calculator'],
+      displayName: 'Calculator',
+      description: 'Evaluate a mathematical expression',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          expression: { type: 'string' },
         },
-      ]),
-      findSkillById: jest.fn(),
-      executeSkill: jest.fn(),
+        required: ['expression'],
+        additionalProperties: false,
+      },
+    };
+    const calculatorDefinition = {
+      name: calculatorTool.runtimeName,
+      description: calculatorTool.description,
+      parameters: calculatorTool.inputSchema,
+    };
+
+    mockToolRegistry = {
+      buildRuntime: jest.fn().mockResolvedValue({
+        tools: [calculatorTool],
+        definitions: [calculatorDefinition],
+        toolMap: new Map([
+          [calculatorTool.runtimeName, calculatorTool],
+          ['calculator', calculatorTool],
+        ]),
+      }),
+      executeToolCall: jest.fn(),
     };
 
     // Mock RAGService
@@ -68,18 +85,10 @@ describe('AgentExecutorService', () => {
       retrieve: jest.fn(),
     };
 
-    // Mock PrismaService
-    mockPrismaService = {
-      skill: {
-        findUnique: jest.fn(),
-      },
-    };
-
     agentExecutor = new AgentExecutorService(
       mockProviderFactory as any,
-      mockSkillService as any,
+      mockToolRegistry as any,
       mockRAGService as any,
-      mockPrismaService as any,
     );
   });
 
@@ -129,7 +138,11 @@ describe('AgentExecutorService', () => {
       mockProvider.chat.mockResolvedValueOnce({
         content: '',
         toolCalls: [
-          { id: 'call_1', name: '___', arguments: { expression: '1+1' } },
+          {
+            id: 'call_1',
+            name: 'builtin_calculator',
+            arguments: { expression: '1+1' },
+          },
         ],
       });
       // 第二次调用返回最终答案
@@ -138,13 +151,40 @@ describe('AgentExecutorService', () => {
         toolCalls: undefined,
       });
 
-      mockSkillService.executeSkill.mockResolvedValue({ result: 2 });
+      mockToolRegistry.executeToolCall.mockResolvedValue({
+        toolCallId: 'call_1',
+        toolName: 'builtin_calculator',
+        result: { expression: '1+1', result: 2 },
+        success: true,
+      });
 
       const result = await agentExecutor.execute(singleConfig, '计算1+1');
 
       expect(result.success).toBe(true);
       expect(result.toolCallCount).toBe(1);
       expect(result.iterations).toBe(2);
+      expect(mockProvider.chat).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          tools: [
+            expect.objectContaining({
+              name: 'builtin_calculator',
+              parameters: expect.objectContaining({
+                type: 'object',
+                required: ['expression'],
+              }),
+            }),
+          ],
+        }),
+      );
+      expect(mockToolRegistry.executeToolCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'builtin_calculator',
+          arguments: { expression: '1+1' },
+        }),
+        expect.any(Map),
+        { userId: undefined, variables: {} },
+      );
     });
 
     it('should stop at max iterations', async () => {
@@ -154,7 +194,7 @@ describe('AgentExecutorService', () => {
           toolCalls: [
             {
               id: 'call_loop',
-              name: '___',
+              name: 'builtin_calculator',
               arguments: {
                 expression: 'loop_' + mockProvider.chat.mock.calls.length,
               },
@@ -164,7 +204,14 @@ describe('AgentExecutorService', () => {
       );
 
       const limitedConfig = { ...singleConfig, maxIterations: 3 };
-      mockSkillService.executeSkill.mockResolvedValue({ result: 'looping' });
+      mockToolRegistry.executeToolCall.mockImplementation(
+        async (toolCall: ToolCall) => ({
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          result: { value: 'looping' },
+          success: true,
+        }),
+      );
 
       const result = await agentExecutor.execute(limitedConfig, '无限循环');
 
@@ -174,26 +221,21 @@ describe('AgentExecutorService', () => {
     });
 
     it('should stop repeated tool calls with an explicit reason', async () => {
-      mockSkillService.getBuiltinSkills.mockResolvedValueOnce([
-        {
-          type: 'calculator',
-          name: 'calculator',
-          description: 'calculator',
-          inputSchema: { type: 'object' },
-        },
-      ]);
       mockProvider.chat.mockResolvedValue({
         content: '',
         toolCalls: [
           {
             id: 'loop_call',
-            name: 'calculator',
+            name: 'builtin_calculator',
             arguments: { expression: 'same' },
           },
         ],
       });
-      mockSkillService.executeSkill.mockResolvedValue({
-        result: 'same result',
+      mockToolRegistry.executeToolCall.mockResolvedValue({
+        toolCallId: 'loop_call',
+        toolName: 'builtin_calculator',
+        result: { value: 'same result' },
+        success: true,
       });
 
       const result = await agentExecutor.execute(singleConfig, '重复调用');
@@ -201,7 +243,7 @@ describe('AgentExecutorService', () => {
       expect(result.success).toBe(false);
       expect(result.terminationReason).toBe('repeated_tool_call');
       expect(result.iterations).toBe(3);
-      expect(mockSkillService.executeSkill).toHaveBeenCalledTimes(3);
+      expect(mockToolRegistry.executeToolCall).toHaveBeenCalledTimes(3);
     });
     it('should produce execution trace', async () => {
       mockProvider.chat.mockResolvedValue({
@@ -391,13 +433,21 @@ describe('AgentExecutorService', () => {
       mockProvider.chat.mockResolvedValueOnce({
         content: '',
         toolCalls: [
-          { id: 'call_1', name: '___', arguments: { expression: 'bad' } },
+          {
+            id: 'call_1',
+            name: 'builtin_calculator',
+            arguments: { expression: 'bad' },
+          },
         ],
       });
 
-      mockSkillService.executeSkill.mockRejectedValue(
-        new Error('工具执行失败'),
-      );
+      mockToolRegistry.executeToolCall.mockResolvedValue({
+        toolCallId: 'call_1',
+        toolName: 'builtin_calculator',
+        result: { error: '工具执行失败' },
+        success: false,
+        error: '工具执行失败',
+      });
 
       mockProvider.chat.mockResolvedValueOnce({
         content: '工具调用失败了',
@@ -428,6 +478,12 @@ describe('AgentExecutorService', () => {
 
       expect(result.success).toBe(true);
       expect(result.toolCallCount).toBe(1);
+      expect(result.messages).toContainEqual(
+        expect.objectContaining({
+          role: 'tool',
+          content: JSON.stringify({ error: '工具执行失败' }),
+        }),
+      );
     });
   });
 

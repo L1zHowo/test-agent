@@ -23,11 +23,10 @@ interface McpServer {
   id: string
   name: string
   description?: string
-  transportType: 'stdio' | 'sse'
+  transportType: 'stdio'
   command?: string
   args?: string[]
   env?: Record<string, string>
-  url?: string
   isActive: boolean
   isConnected: boolean
   createdAt: string
@@ -51,10 +50,9 @@ const McpManager: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    transportType: 'stdio' as 'stdio' | 'sse',
+    transportType: 'stdio' as 'stdio',
     command: '',
     args: '',
-    url: '',
   })
 
   // 工具面板
@@ -89,7 +87,7 @@ const McpManager: React.FC = () => {
 
   const handleAdd = () => {
     setEditingServer(null)
-    setFormData({ name: '', description: '', transportType: 'stdio', command: '', args: '', url: '' })
+    setFormData({ name: '', description: '', transportType: 'stdio', command: '', args: '' })
     setModalVisible(true)
   }
 
@@ -101,7 +99,6 @@ const McpManager: React.FC = () => {
       transportType: server.transportType,
       command: server.command || '',
       args: Array.isArray(server.args) ? server.args.join(' ') : '',
-      url: server.url || '',
     })
     setModalVisible(true)
   }
@@ -111,7 +108,7 @@ const McpManager: React.FC = () => {
       message.error('请输入服务器名称')
       return
     }
-    if (formData.transportType === 'stdio' && !formData.command.trim()) {
+    if (!formData.command.trim()) {
       message.error('请输入启动命令')
       return
     }
@@ -122,12 +119,8 @@ const McpManager: React.FC = () => {
       transportType: formData.transportType,
     }
 
-    if (formData.transportType === 'stdio') {
-      payload.command = formData.command.trim()
-      payload.args = formData.args.trim() ? formData.args.trim().split(/\s+/) : []
-    } else {
-      payload.url = formData.url.trim()
-    }
+    payload.command = formData.command.trim()
+    payload.args = formData.args.trim() ? formData.args.trim().split(/\s+/) : []
 
     try {
       if (editingServer) {
@@ -317,9 +310,7 @@ const McpManager: React.FC = () => {
               <div className="skill-card-body">
                 <h3 className="skill-card-name">{server.name}</h3>
                 <p className="skill-card-desc">
-                  {server.description || (server.transportType === 'stdio'
-                    ? `${server.command} ${(server.args || []).join(' ')}`
-                    : server.url || '暂无描述')}
+                  {server.description || `${server.command} ${(server.args || []).join(' ')}`}
                 </p>
               </div>
 
@@ -441,7 +432,6 @@ const McpManager: React.FC = () => {
               onChange={(v) => setFormData({ ...formData, transportType: v })}
             >
               <Select.Option value="stdio">STDIO（命令行启动）</Select.Option>
-              <Select.Option value="sse" disabled>SSE（HTTP 连接）— 即将支持</Select.Option>
             </Select>
           </Form.Item>
           {formData.transportType === 'stdio' && (
@@ -465,15 +455,6 @@ const McpManager: React.FC = () => {
                 />
               </Form.Item>
             </>
-          )}
-          {formData.transportType === 'sse' && (
-            <Form.Item label="服务器 URL" required>
-              <Input
-                value={formData.url}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                placeholder="http://localhost:3001/mcp"
-              />
-            </Form.Item>
           )}
           <div className="modal-footer">
             <Button onClick={() => setModalVisible(false)}>取消</Button>

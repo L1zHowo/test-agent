@@ -14,10 +14,13 @@
  * - 多模型自动路由（根据 model ID 选择对应 Provider）
  */
 import { Injectable, Logger } from '@nestjs/common';
-import { SkillService } from '../../skill/services/skill.service';
 import { RAGService } from '../../rag/services/rag.service';
-import { PrismaService } from '../../../common/services/prisma.service';
 import { LLMProviderFactory } from '../providers/llm-provider.factory';
+import {
+  RuntimeTool,
+  ToolExecutionContext,
+  ToolRegistryService,
+} from './tool-registry.service';
 import {
   AgentNodeConfig,
   AgentState,
@@ -41,9 +44,8 @@ export class AgentExecutorService {
 
   constructor(
     private readonly providerFactory: LLMProviderFactory,
-    private readonly skillService: SkillService,
+    private readonly toolRegistry: ToolRegistryService,
     private readonly ragService: RAGService,
-    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -154,9 +156,12 @@ export class AgentExecutorService {
     };
 
     // 加载可用工具
-    const tools = await this.loadTools(agentConfig.toolIds);
-    const toolMap = this.buildToolMap(tools);
-    const toolDefinitions = this.buildToolDefinitions(tools);
+    const toolRuntime = await this.toolRegistry.buildRuntime(
+      agentConfig.toolIds,
+      this.getToolExecutionContext(options?.context),
+    );
+    const toolMap = toolRuntime.toolMap;
+    const toolDefinitions = toolRuntime.definitions;
 
     // RAG 上下文（如果启用）
     if (agentConfig.ragEnabled && agentConfig.knowledgeBaseIds.length > 0) {
@@ -215,10 +220,10 @@ export class AgentExecutorService {
         // 逐个执行工具
         for (const toolCall of llmResponse.toolCalls) {
           const signature = this.createToolCallSignature(toolCall);
-          const toolResult = await this.executeToolCall(
+          const toolResult = await this.toolRegistry.executeToolCall(
             toolCall,
             toolMap,
-            options?.context,
+            this.getToolExecutionContext(options?.context),
           );
           state.toolResults.push(toolResult);
           const resultSignature = this.createToolResultSignature(toolResult);
@@ -406,15 +411,18 @@ export class AgentExecutorService {
       string,
       {
         tools: ToolDefinition[];
-        toolMap: Map<string, { id: string; name: string }>;
+        toolMap: Map<string, RuntimeTool>;
         config: WorkerAgentConfig;
       }
     >();
 
     for (const worker of supervisorConfig.workers) {
-      const tools = await this.loadTools(worker.toolIds);
-      const toolMap = this.buildToolMap(tools);
-      const toolDefinitions = this.buildToolDefinitions(tools);
+      const toolRuntime = await this.toolRegistry.buildRuntime(
+        worker.toolIds,
+        this.getToolExecutionContext(options?.context),
+      );
+      const toolMap = toolRuntime.toolMap;
+      const toolDefinitions = toolRuntime.definitions;
       workerToolMaps.set(worker.id, {
         tools: toolDefinitions,
         toolMap,
@@ -681,7 +689,7 @@ export class AgentExecutorService {
     workerConfig: WorkerAgentConfig,
     task: string,
     toolDefinitions: ToolDefinition[],
-    toolMap: Map<string, { id: string; name: string }>,
+    toolMap: Map<string, RuntimeTool>,
     options?: AgentRunOptions,
   ): Promise<AgentExecutionResult> {
     const maxIterations = 5; // Worker 最多 5 轮迭代
@@ -752,10 +760,10 @@ export class AgentExecutorService {
 
         for (const toolCall of llmResponse.toolCalls) {
           const signature = this.createToolCallSignature(toolCall);
-          const toolResult = await this.executeToolCall(
+          const toolResult = await this.toolRegistry.executeToolCall(
             toolCall,
             toolMap,
-            options?.context,
+            this.getToolExecutionContext(options?.context),
           );
           state.toolResults.push(toolResult);
           const resultSignature = this.createToolResultSignature(toolResult);
@@ -881,146 +889,20 @@ export class AgentExecutorService {
     return value;
   }
 
-  // ============================================================
-
-  /**
-   * 加载工具列表
-   */
-  private async loadTools(
-    toolIds: string[],
-  ): Promise<
-    Array<{ id: string; name: string; description: string; inputSchema: any }>
-  > {
-    if (!toolIds || toolIds.length === 0) {
-      // 如果没有指定工具，加载所有内置工具
-      const builtinSkills = await this.skillService.getBuiltinSkills();
-      return builtinSkills.map((s) => ({
-        id: s.type,
-        name: s.name,
-        description: s.description,
-        inputSchema: s.inputSchema,
-      }));
-    }
-
-    const tools: Array<{
-      id: string;
-      name: string;
-      description: string;
-      inputSchema: any;
-    }> = [];
-
-    for (const toolId of toolIds) {
-      try {
-        // 使用 PrismaService 直接查询（跳过 userId 权限校验）
-        const skill = await this.prisma.skill.findUnique({
-          where: { id: toolId },
-        });
-
-        if (skill) {
-          tools.push({
-            id: skill.id,
-            name: skill.name || 'unknown',
-            description: skill.description || '',
-            inputSchema: skill.inputSchema
-              ? typeof skill.inputSchema === 'string'
-                ? JSON.parse(skill.inputSchema)
-                : skill.inputSchema
-              : undefined,
-          });
-        }
-      } catch {
-        this.logger.warn(`Tool ${toolId} not found, skipping`);
-      }
-    }
-
-    return tools;
-  }
-
-  /**
-   * 构建工具名称到 ID 的映射
-   */
-  private buildToolMap(
-    tools: Array<{ id: string; name: string }>,
-  ): Map<string, { id: string; name: string }> {
-    const map = new Map<string, { id: string; name: string }>();
-    for (const tool of tools) {
-      // 使用处理后的名称作为 key（去除特殊字符）
-      const sanitizedName = tool.name
-        .replace(/[^a-zA-Z0-9_]/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '');
-      map.set(sanitizedName, { id: tool.id, name: tool.name });
-    }
-    return map;
-  }
-
-  /**
-   * 构建工具定义（通过 Provider）
-   */
-  private buildToolDefinitions(
-    tools: Array<{
-      id: string;
-      name: string;
-      description: string;
-      inputSchema: any;
-    }>,
-  ): ToolDefinition[] {
-    // 使用 Qwen Provider 的 buildToolDefinitions 作为默认（OpenAI 兼容格式）
-    // 因为所有 Provider 都兼容此格式或内部转换
-    const qwenProvider = this.providerFactory.create('qwen');
-    return qwenProvider.buildToolDefinitions(tools);
-  }
-
-  /**
-   * 执行工具调用
-   */
-  private async executeToolCall(
-    toolCall: ToolCall,
-    toolMap: Map<string, { id: string; name: string }>,
+  private getToolExecutionContext(
     context?: Record<string, any>,
-  ): Promise<ToolResult> {
-    const toolInfo = toolMap.get(toolCall.name);
-
-    if (!toolInfo) {
-      return {
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
-        result: { error: `Tool ${toolCall.name} not found` },
-        success: false,
-        error: `Tool ${toolCall.name} not found`,
-      };
-    }
-
-    try {
-      // 替换参数中的上下文变量
-      const resolvedArgs = this.resolveVariables(
-        toolCall.arguments,
-        context || {},
-      );
-
-      const result = await this.skillService.executeSkill(
-        toolInfo.id,
-        resolvedArgs,
-      );
-
-      return {
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
-        result,
-        success: true,
-      };
-    } catch (error) {
-      return {
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
-        result: {
-          error: error instanceof Error ? error.message : 'Unknown error',
-        },
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
+  ): ToolExecutionContext {
+    return {
+      userId: typeof context?.userId === 'string'
+        ? context.userId
+        : typeof context?._userId === 'string'
+          ? context._userId
+          : undefined,
+      variables: context || {},
+    };
   }
+
+  // ============================================================
 
   // ============================================================
   // RAG 集成
@@ -1130,36 +1012,6 @@ ${workerDescriptions}
     return match ? match[1] : toolName;
   }
 
-  /**
-   * 变量替换（同 LLMNodeExecutor）
-   */
-  private resolveVariables(
-    obj: Record<string, any>,
-    context: Record<string, any>,
-  ): Record<string, any> {
-    const resolved: Record<string, any> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (typeof value === 'string') {
-        resolved[key] = value.replace(/\{\{(.+?)\}\}/g, (match, p1) => {
-          const keys = p1.trim().split('.');
-          let val: any = context;
-          for (const k of keys) {
-            if (val && typeof val === 'object' && k in val) {
-              val = val[k];
-            } else {
-              return match;
-            }
-          }
-          return typeof val === 'object' ? JSON.stringify(val) : String(val);
-        });
-      } else if (typeof value === 'object' && value !== null) {
-        resolved[key] = this.resolveVariables(value, context);
-      } else {
-        resolved[key] = value;
-      }
-    }
-    return resolved;
-  }
 
   /**
    * 添加轨迹条目

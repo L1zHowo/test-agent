@@ -2,9 +2,17 @@ import React, { useEffect, useState } from 'react'
 import { Form, Input, Select, Slider, InputNumber, Switch, Divider, Card, Button, Space, Tag, Empty, Typography, Tooltip, message } from 'antd'
 import { PlusOutlined, DeleteOutlined, RobotOutlined, CopyOutlined } from '@ant-design/icons'
 import { useStore } from '../../store'
+import request from '../../utils/axios'
 
 const { Option, OptGroup } = Select
 const { Text } = Typography
+
+interface McpToolItem {
+  id: string
+  name: string
+  description?: string
+  serverName?: string
+}
 
 const MODEL_GROUPS = [
   {
@@ -45,11 +53,26 @@ const ConfigPanel: React.FC = () => {
   const { selectedNode, updateNodeData, knowledgeBases, fetchKnowledgeBases, skills, fetchSkills } = useStore()
   const [form] = Form.useForm()
   const [workers, setWorkers] = useState<any[]>([])
+  const [mcpTools, setMcpTools] = useState<McpToolItem[]>([])
 
   useEffect(() => {
     fetchKnowledgeBases()
     fetchSkills()
   }, [fetchKnowledgeBases, fetchSkills])
+
+  useEffect(() => {
+    const fetchMcpTools = async () => {
+      try {
+        const response = await request.get('/mcp/tools') as any
+        const tools = Array.isArray(response?.data) ? response.data : response
+        setMcpTools(Array.isArray(tools) ? tools : [])
+      } catch {
+        setMcpTools([])
+      }
+    }
+
+    fetchMcpTools()
+  }, [])
 
   useEffect(() => {
     if (selectedNode) {
@@ -170,9 +193,21 @@ const ConfigPanel: React.FC = () => {
         </Form.Item>
         <Form.Item name="toolIds" label="可用工具">
           <Select mode="multiple" placeholder="选择工具（多选，留空则使用全部内置工具）">
-            {Array.isArray(skills) && skills.map(s => (
-              <Option key={s.id} value={s.id}>{s.name}</Option>
-            ))}
+            <OptGroup label="Skills">
+              {Array.isArray(skills) && skills.map(s => (
+                <Option key={s.id} value={s.id}>{s.name}</Option>
+              ))}
+            </OptGroup>
+            <OptGroup label="MCP">
+              {mcpTools.map(tool => (
+                <Option key={tool.id} value={tool.id}>
+                  <Space>
+                    <span>{tool.name}</span>
+                    {tool.serverName && <Tag color="purple">{tool.serverName}</Tag>}
+                  </Space>
+                </Option>
+              ))}
+            </OptGroup>
           </Select>
         </Form.Item>
         <Divider orientation="left" style={{ margin: '12px 0 12px' }}>🧠 记忆</Divider>

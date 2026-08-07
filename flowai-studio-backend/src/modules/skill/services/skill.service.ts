@@ -112,6 +112,10 @@ export class SkillService {
     }
   }
 
+  async executeBuiltinSkill(type: string, params: Record<string, any>) {
+    return executeBuiltinSkill(type, params);
+  }
+
   // 执行自定义工具
   private async executeCustomSkill(skill: any, params: Record<string, any>) {
     const config = JSON.parse(skill.config || '{}');
@@ -150,7 +154,11 @@ export class SkillService {
         type: 'time',
         name: '时间工具',
         description: '获取当前时间和日期',
-        inputSchema: {},
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
         outputSchema: {
           datetime: 'string',
           timestamp: 'number',
@@ -163,10 +171,30 @@ export class SkillService {
         name: 'HTTP请求',
         description: '发送HTTP请求',
         inputSchema: {
-          url: 'string',
-          method: 'string',
-          headers: 'object',
-          body: 'object',
+          type: 'object',
+          properties: {
+            url: {
+              type: 'string',
+              format: 'uri',
+              description: '请求的完整 URL',
+            },
+            method: {
+              type: 'string',
+              enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
+              default: 'GET',
+              description: 'HTTP 请求方法',
+            },
+            headers: {
+              type: 'object',
+              additionalProperties: { type: 'string' },
+              description: 'HTTP 请求头',
+            },
+            body: {
+              description: '请求体，可以是任意 JSON 值',
+            },
+          },
+          required: ['url'],
+          additionalProperties: false,
         },
         outputSchema: {
           status: 'number',
@@ -179,8 +207,19 @@ export class SkillService {
         name: 'JSON处理',
         description: '解析或生成JSON',
         inputSchema: {
-          action: 'string',
-          data: 'any',
+          type: 'object',
+          properties: {
+            action: {
+              type: 'string',
+              enum: ['parse', 'stringify'],
+              description: 'parse 将 JSON 字符串解析为对象，stringify 将数据序列化为 JSON 字符串',
+            },
+            data: {
+              description: '需要解析或序列化的数据；parse 时必须是 JSON 字符串',
+            },
+          },
+          required: ['action', 'data'],
+          additionalProperties: false,
         },
         outputSchema: {
           result: 'any',
@@ -191,9 +230,25 @@ export class SkillService {
         name: '正则表达式',
         description: '使用正则表达式匹配文本',
         inputSchema: {
-          text: 'string',
-          pattern: 'string',
-          flags: 'string',
+          type: 'object',
+          properties: {
+            text: {
+              type: 'string',
+              description: '需要匹配的文本',
+            },
+            pattern: {
+              type: 'string',
+              description: 'JavaScript 正则表达式，不包含两侧斜杠',
+            },
+            flags: {
+              type: 'string',
+              pattern: '^[dgimsuvy]*$',
+              default: '',
+              description: '可选的 JavaScript 正则标志，例如 gi',
+            },
+          },
+          required: ['text', 'pattern'],
+          additionalProperties: false,
         },
         outputSchema: {
           matches: 'array',
@@ -205,7 +260,15 @@ export class SkillService {
         name: '计算器',
         description: '计算数学表达式，支持加减乘除、取余、乘方',
         inputSchema: {
-          expression: 'string',
+          type: 'object',
+          properties: {
+            expression: {
+              type: 'string',
+              description: '数学表达式，例如 (123 + 456) * 2；乘方使用 ^',
+            },
+          },
+          required: ['expression'],
+          additionalProperties: false,
         },
         outputSchema: {
           expression: 'string',
@@ -217,8 +280,21 @@ export class SkillService {
         name: '代码执行',
         description: '在安全沙箱中执行 JavaScript 代码',
         inputSchema: {
-          code: 'string',
-          language: 'string',
+          type: 'object',
+          properties: {
+            code: {
+              type: 'string',
+              description: '需要执行的 JavaScript 代码',
+            },
+            language: {
+              type: 'string',
+              enum: ['javascript'],
+              default: 'javascript',
+              description: '代码语言，目前仅支持 javascript',
+            },
+          },
+          required: ['code'],
+          additionalProperties: false,
         },
         outputSchema: {
           result: 'any',

@@ -17,17 +17,19 @@ import { Module } from '@nestjs/common';
 import { AgentExecutorService } from './services/agent-executor.service';
 import { LLMModelService } from './services/llm-model.service';
 import { TokenUsageService } from './services/token-usage.service';
+import { ToolRegistryService } from './services/tool-registry.service';
 import { LLMProviderFactory } from './providers/llm-provider.factory';
 import { LLMModelController } from './controllers/llm-model.controller';
 import { TokenUsageController } from './controllers/token-usage.controller';
 import { SkillModule } from '../skill/skill.module';
+import { McpModule } from '../mcp/mcp.module';
 import { RAGModule } from '../rag/rag.module';
 import { PrismaModule } from '../../common/modules/prisma.module';
 
 @Module({
-  imports: [SkillModule, RAGModule, PrismaModule],
+  imports: [SkillModule, McpModule, RAGModule, PrismaModule],
   controllers: [LLMModelController, TokenUsageController],
-  providers: [AgentExecutorService, LLMModelService, LLMProviderFactory, TokenUsageService],
-  exports: [AgentExecutorService, LLMModelService, LLMProviderFactory, TokenUsageService],
+  providers: [AgentExecutorService, LLMModelService, LLMProviderFactory, TokenUsageService, ToolRegistryService],
+  exports: [AgentExecutorService, LLMModelService, LLMProviderFactory, TokenUsageService, ToolRegistryService],
 })
 export class AgentModule {}
