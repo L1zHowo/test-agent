@@ -22,6 +22,7 @@
  * - HNSW 索引搜索性能优秀
  */
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../../common/services/prisma.service';
 import {
   VectorStore,
@@ -70,42 +71,58 @@ export class PgVectorStore implements VectorStore {
   async upsert(collectionName: string, documents: VectorDocument[]): Promise<void> {
     if (documents.length === 0) return;
 
-    // 使用批量 INSERT（pgvector 不支持 ON CONFLICT with vector type）
-    // 先删除已存在的记录，再插入新记录
-    const existingIds = documents.filter((d) => d.id).map((d) => d.id);
-    if (existingIds.length > 0) {
-      const idList = existingIds.map((id) => `'${id}'`).join(',');
-      await this.prisma.$executeRawUnsafe(
-        `DELETE FROM document_chunks WHERE id IN (${idList})`,
-      );
-    }
-
-    // 批量插入
+    // Validate and build the complete batch before deleting existing rows.
     const values = documents.map((doc) => {
-      const vectorStr = `[${doc.embedding.join(',')}]`;
-      const escapedContent = doc.content.replace(/'/g, "''");
-      const metadataValue = doc.metadata
-        ? `'${JSON.stringify(doc.metadata).replace(/'/g, "''")}'`
-        : 'NULL';
+      const documentId = doc.metadata?.documentId;
+      const chunkIndex = doc.metadata?.chunkIndex;
+      const startIndex = doc.metadata?.startIndex;
+      const endIndex = doc.metadata?.endIndex;
+      if (
+        typeof documentId !== 'string' ||
+        !Number.isInteger(chunkIndex) ||
+        !Number.isInteger(startIndex) ||
+        !Number.isInteger(endIndex)
+      ) {
+        throw new Error('PgVectorStore document metadata is missing required chunk fields');
+      }
+      if (doc.content.includes('\u0000')) {
+        throw new Error('PgVectorStore content contains an unsupported NUL character');
+      }
 
-      return `(
-        '${doc.id}',
-        '${escapedContent}',
-        '${vectorStr}'::vector,
-        ${metadataValue},
+      const vectorStr = `[${doc.embedding.join(',')}]`;
+      return Prisma.sql`(
+        ${doc.id},
+        ${doc.content},
+        ${vectorStr}::vector,
+        ${chunkIndex},
+        ${startIndex},
+        ${endIndex},
+        ${doc.metadata ? JSON.stringify(doc.metadata) : null},
+        ${documentId},
         NOW()
       )`;
     });
 
-    // 分批插入，每批最多 100 条（避免 SQL 过长）
+    const existingIds = documents.filter((d) => d.id).map((d) => d.id);
     const batchSize = 100;
-    for (let i = 0; i < values.length; i += batchSize) {
-      const batch = values.slice(i, i + batchSize).join(',\n');
-      await this.prisma.$executeRawUnsafe(`
-        INSERT INTO document_chunks (id, content, embedding, metadata, created_at)
-        VALUES ${batch}
-      `);
-    }
+    await this.prisma.$transaction(async (tx) => {
+      if (existingIds.length > 0) {
+        await tx.$executeRaw(Prisma.sql`
+          DELETE FROM document_chunks WHERE id IN (${Prisma.join(existingIds)})
+        `);
+      }
+
+      for (let i = 0; i < values.length; i += batchSize) {
+        const batch = values.slice(i, i + batchSize);
+        await tx.$executeRaw(Prisma.sql`
+          INSERT INTO document_chunks (
+            id, content, embedding, "chunkIndex", "startIndex", "endIndex",
+            metadata, "documentId", "createdAt"
+          )
+          VALUES ${Prisma.join(batch)}
+        `);
+      }
+    });
 
     this.logger.log(`Upserted ${documents.length} vectors to ${collectionName}`);
   }
@@ -259,26 +276,26 @@ export class PgVectorStore implements VectorStore {
     if (filter.match) {
       const { key, value } = filter.match;
       if (typeof value === 'string') {
-        parts.push(`metadata->>'${key}' = '${value.replace(/'/g, "''")}'`);
+        parts.push(`(metadata::jsonb)->>'${key}' = '${value.replace(/'/g, "''")}'`);
       } else {
-        parts.push(`metadata->>'${key}' = '${value}'`);
+        parts.push(`(metadata::jsonb)->>'${key}' = '${value}'`);
       }
     }
 
     if (filter.range) {
       const { key, gte, lte } = filter.range;
       if (gte !== undefined) {
-        parts.push(`(metadata->>'${key}')::numeric >= ${gte}`);
+        parts.push(`((metadata::jsonb)->>'${key}')::numeric >= ${gte}`);
       }
       if (lte !== undefined) {
-        parts.push(`(metadata->>'${key}')::numeric <= ${lte}`);
+        parts.push(`((metadata::jsonb)->>'${key}')::numeric <= ${lte}`);
       }
     }
 
     if (filter.in) {
       const { key, values } = filter.in;
       const valueList = values.map((v: any) => `'${String(v).replace(/'/g, "''")}'`).join(',');
-      parts.push(`metadata->>'${key}' IN (${valueList})`);
+      parts.push(`(metadata::jsonb)->>'${key}' IN (${valueList})`);
     }
 
     return parts.join(' AND ');

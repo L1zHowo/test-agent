@@ -234,6 +234,7 @@ export class RAGService {
     } else {
       content = contentBuffer.toString('utf-8');
     }
+    content = content.replace(/\u0000/g, '');
 
     if (!content.trim()) {
       throw new BadRequestException('文档内容为空或当前格式暂不支持');
@@ -259,12 +260,18 @@ export class RAGService {
     });
 
     // 异步处理文档分块和向量化
-    this.processAndEmbedDocument(document.id, content, knowledgeBaseId).catch((error) => {
+    this.processAndEmbedDocument(document.id, content, knowledgeBaseId).catch(async (error) => {
       this.logger.error(`Document processing failed for ${document.id}: ${error instanceof Error ? error.message : error}`);
-      this.prisma.document.update({
-        where: { id: document.id },
-        data: { status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' },
-      }).catch(() => {});
+      try {
+        await this.prisma.document.update({
+          where: { id: document.id },
+          data: { status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' },
+        });
+      } catch (statusError) {
+        this.logger.error(
+          `Failed to mark document ${document.id} as failed: ${statusError instanceof Error ? statusError.message : statusError}`,
+        );
+      }
     });
 
     // 失效知识库详情 + 列表缓存 + 检索缓存
@@ -295,6 +302,11 @@ export class RAGService {
 
     // 2. 批量生成向量
     const batchResult = await embeddingProvider.embedBatch(chunks);
+    const emptyEmbeddingCount = batchResult.results.filter((result) => !result.embedding?.length).length;
+    const failedEmbeddingCount = Math.max(emptyEmbeddingCount, batchResult.failedIndices.length);
+    if (failedEmbeddingCount > 0) {
+      throw new Error(`Embedding failed for ${failedEmbeddingCount} chunk(s)`);
+    }
 
     // 3. 写入向量存储
     const documents = batchResult.results.map((result, index) => ({
@@ -312,24 +324,7 @@ export class RAGService {
 
     await vectorStore.upsert(knowledgeBaseId, documents);
 
-    // 4. 同时写入 document_chunks 表（保留兼容，方便 ORM 查询）
-    await this.prisma.batchInsertVectorChunks({
-      documentId,
-      chunks: batchResult.results.map((result, index) => ({
-        content: result.content,
-        embedding: result.embedding,
-        chunkIndex: index,
-        startIndex: 0,
-        endIndex: result.content.length,
-        metadata: JSON.stringify({
-          documentId,
-          knowledgeBaseId,
-          chunkIndex: index,
-        }),
-      })),
-    });
-
-    // 5. 更新文档状态
+    // 4. 更新文档状态
     await this.prisma.document.update({
       where: { id: documentId },
       data: { status: 'completed' },
@@ -817,26 +812,23 @@ export class RAGService {
    * - Dify: 支持 PDF 解析（pdf-parse + 自定义解析器）
    * - FastGPT: 支持 PDF 解析
    * - Coze: 支持 PDF 解析
-   * - 本设计: pdf-parse 轻量解析 + 降级到纯文本
+   * - 本设计: pdf-parse 轻量解析
    */
   private async parsePdf(buffer: Buffer): Promise<string> {
     try {
-      // pdf-parse 使用 CommonJS 导出，需要 .default.default 或直接调用
-      const pdfParseModule = await import('pdf-parse');
-      const pdfParse = pdfParseModule.default || pdfParseModule;
-      const data = await (pdfParse as any)(buffer);
-      return data.text || '';
-    } catch (error) {
-      // pdf-parse 未安装时降级尝试纯文本
-      this.logger.warn(
-        `PDF parsing failed (pdf-parse may not be installed): ${error instanceof Error ? error.message : error}. ` +
-        `Install with: npm install pdf-parse @types/pdf-parse`,
-      );
+      const { PDFParse } = await import('pdf-parse');
+      const parser = new PDFParse({ data: buffer });
       try {
-        return buffer.toString('utf-8');
-      } catch {
-        return '';
+        const data = await parser.getText();
+        return data.text || '';
+      } finally {
+        await parser.destroy();
       }
+    } catch (error) {
+      this.logger.warn(
+        `PDF parsing failed: ${error instanceof Error ? error.message : error}`,
+      );
+      throw new BadRequestException('PDF 文件解析失败，请确认文件有效且未加密');
     }
   }
 

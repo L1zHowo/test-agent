@@ -139,7 +139,7 @@ export class BM25KeywordService {
     const conditions: string[] = [];
 
     // 知识库过滤 — 通过 metadata JSON 字段或关联查询
-    conditions.push(`metadata->>'knowledgeBaseId' = '${knowledgeBaseId}'`);
+    conditions.push(`(metadata::jsonb)->>'knowledgeBaseId' = '${knowledgeBaseId}'`);
 
     // 额外元数据过滤
     if (filter) {
@@ -251,7 +251,7 @@ export class BM25KeywordService {
 
     // 构建 WHERE
     const conditions: string[] = [`(${likeConditions})`];
-    conditions.push(`metadata->>'knowledgeBaseId' = '${knowledgeBaseId}'`);
+    conditions.push(`(metadata::jsonb)->>'knowledgeBaseId' = '${knowledgeBaseId}'`);
 
     if (filter) {
       const filterConditions = this.buildFilterConditions(filter);
@@ -310,20 +310,20 @@ export class BM25KeywordService {
 
     for (const [key, value] of Object.entries(filter)) {
       if (typeof value === 'string') {
-        conditions.push(`metadata->>'${key}' = '${value.replace(/'/g, "''")}'`);
+        conditions.push(`(metadata::jsonb)->>'${key}' = '${value.replace(/'/g, "''")}'`);
       } else if (Array.isArray(value)) {
         const valueList = value.map((v: any) => `'${String(v).replace(/'/g, "''")}'`).join(',');
-        conditions.push(`metadata->>'${key}' IN (${valueList})`);
+        conditions.push(`(metadata::jsonb)->>'${key}' IN (${valueList})`);
       } else if (typeof value === 'object' && value !== null) {
         // Range filter: { gte: 0, lte: 100 }
         if (value.gte !== undefined) {
-          conditions.push(`(metadata->>'${key}')::numeric >= ${value.gte}`);
+          conditions.push(`((metadata::jsonb)->>'${key}')::numeric >= ${value.gte}`);
         }
         if (value.lte !== undefined) {
-          conditions.push(`(metadata->>'${key}')::numeric <= ${value.lte}`);
+          conditions.push(`((metadata::jsonb)->>'${key}')::numeric <= ${value.lte}`);
         }
       } else {
-        conditions.push(`metadata->>'${key}' = '${value}'`);
+        conditions.push(`(metadata::jsonb)->>'${key}' = '${value}'`);
       }
     }
 

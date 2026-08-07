@@ -66,6 +66,27 @@ const KnowledgeBase: React.FC = () => {
 
   useEffect(() => { fetchKnowledgeBases() }, [])
 
+  const hasProcessingDocuments = documents.some((document) => document.status === 'processing')
+  useEffect(() => {
+    if (!documentModalVisible || !selectedKb?.id || !hasProcessingDocuments) return
+
+    let inFlight = false
+    const timer = window.setInterval(async () => {
+      if (inFlight) return
+      inFlight = true
+      try {
+        const updatedKb = await fetchKnowledgeBaseById(selectedKb.id)
+        setDocuments(updatedKb.documents || [])
+      } catch {
+        // Keep the current list and retry on the next interval.
+      } finally {
+        inFlight = false
+      }
+    }, 1500)
+
+    return () => window.clearInterval(timer)
+  }, [documentModalVisible, selectedKb?.id, hasProcessingDocuments, fetchKnowledgeBaseById])
+
   const safeKnowledgeBases = Array.isArray(knowledgeBases) ? knowledgeBases : []
   const totalDocuments = useMemo(
     () => safeKnowledgeBases.reduce((count, kb) => count + (kb.documents?.length || 0), 0),
