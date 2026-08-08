@@ -89,6 +89,7 @@ export class QwenProvider extends BaseLLMProvider {
             'Content-Type': 'application/json',
           },
           timeout: this.config.timeout || 60000,
+          signal: params.signal,
         },
       );
 
@@ -123,8 +124,9 @@ export class QwenProvider extends BaseLLMProvider {
           Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
-        responseType: 'stream',
-        timeout: this.config.timeout || 60000,
+          responseType: 'stream',
+          timeout: this.config.timeout || 60000,
+          signal: params.signal,
       },
     );
 

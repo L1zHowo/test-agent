@@ -33,6 +33,7 @@ export class AgentNodeExecutor implements INodeExecutor {
     const agentOptions: AgentRunOptions = {
       context,
       sseSubject: options?.sseSubject,
+      signal: options?.signal,
     };
 
     const result = await this.agentExecutor.execute(config, input, agentOptions);

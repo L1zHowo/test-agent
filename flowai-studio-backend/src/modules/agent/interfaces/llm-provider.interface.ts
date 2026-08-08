@@ -82,6 +82,7 @@ export interface LLMChatParams {
   jsonMode?: boolean;
   /** 停止序列 */
   stopSequences?: string[];
+  signal?: AbortSignal;
 }
 
 /** LLM Token 使用量 */

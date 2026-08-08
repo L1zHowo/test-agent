@@ -1,12 +1,12 @@
 import axios from 'axios';
 import { VM } from 'vm2';
 
-export async function executeBuiltinSkill(type: string, params: Record<string, any>): Promise<any> {
+export async function executeBuiltinSkill(type: string, params: Record<string, any>, signal?: AbortSignal): Promise<any> {
   switch (type) {
     case 'time':
       return executeTimeSkill();
     case 'http':
-      return executeHttpSkill(params);
+      return executeHttpSkill(params, signal);
     case 'json':
       return executeJsonSkill(params);
     case 'regex':
@@ -30,7 +30,7 @@ function executeTimeSkill(): any {
   };
 }
 
-async function executeHttpSkill(params: any): Promise<any> {
+async function executeHttpSkill(params: any, signal?: AbortSignal): Promise<any> {
   const { url, method = 'GET', headers = {}, body } = params;
 
   if (!url) {
@@ -44,6 +44,7 @@ async function executeHttpSkill(params: any): Promise<any> {
       headers,
       data: body,
       timeout: 10000, // 10 秒超时
+      signal,
     });
 
     return {

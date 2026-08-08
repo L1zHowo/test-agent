@@ -1,18 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { INodeExecutor } from '../../types';
+import { INodeExecutor, NodeExecutionOptions } from '../../types';
 import { SkillService } from '../../../skill/services/skill.service';
 
 @Injectable()
 export class SkillNodeExecutor implements INodeExecutor {
   constructor(private readonly skillService: SkillService) {}
 
-  async execute(node: any, context: Record<string, any>): Promise<Record<string, any>> {
+  async execute(node: any, context: Record<string, any>, options?: NodeExecutionOptions): Promise<Record<string, any>> {
     const nodeData = node.data as any;
     const { skillId, parameters } = nodeData;
 
     const resolvedParams = this.resolveParameters(parameters, context);
 
-    const result = await this.skillService.executeSkill(skillId, resolvedParams);
+    const result = await this.skillService.executeSkill(skillId, resolvedParams, undefined, options?.signal);
 
     return { result };
   }

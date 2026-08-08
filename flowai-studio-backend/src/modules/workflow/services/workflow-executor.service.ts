@@ -9,6 +9,7 @@ import {
   HeartbeatManager,
   TimeoutError,
   CancelledError,
+  combineAbortSignals,
 } from '../utils/execution-control.util';
 
 /** 执行控制默认值 */
@@ -25,7 +26,10 @@ export class WorkflowExecutorService {
   private readonly logger = new Logger(WorkflowExecutorService.name);
 
   /** 正在运行的工作流取消标记 */
-  private readonly cancelTokens = new Map<string, { cancelled: boolean }>();
+  private readonly cancelTokens = new Map<string, {
+    cancelled: boolean;
+    controller: AbortController;
+  }>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -54,7 +58,8 @@ export class WorkflowExecutorService {
 
     // 注册取消标记
     const execId = executionId || `${workflowId}_${Date.now()}`;
-    const cancelToken = { cancelled: false };
+    const executionController = new AbortController();
+    const cancelToken = { cancelled: false, controller: executionController };
     this.cancelTokens.set(execId, cancelToken);
 
     await this.prisma.workflowExecution.create({
@@ -145,6 +150,7 @@ export class WorkflowExecutorService {
 
         currentNodeId = nodeId;
         const executor = this.factory.getExecutor(node.type);
+        let nodeController: AbortController | undefined;
 
         try {
           sseSubject?.next({
@@ -163,13 +169,21 @@ export class WorkflowExecutorService {
 
           // 节点执行：超时控制 + 重试
           const output = await retryWithBackoff(
-            () =>
-              withTimeout(
-                executor.execute(node, context, { sseSubject }),
+            () => {
+              nodeController = new AbortController();
+              const signal = combineAbortSignals([
+                executionController.signal,
+                nodeController.signal,
+              ]);
+
+              return withTimeout(
+                executor.execute(node, context, { sseSubject, signal }),
                 control.nodeTimeoutMs,
                 'node',
                 nodeId,
-              ),
+                () => nodeController?.abort(),
+              );
+            },
             {
               maxRetries: control.maxRetries,
               onRetry: (attempt, error, delayMs) => {
@@ -242,6 +256,23 @@ export class WorkflowExecutorService {
             }
           }
         } catch (error) {
+          // Axios/fetch 可能先于 withTimeout 抛出取消错误，统一转换为节点超时。
+          if (
+            nodeController?.signal.aborted &&
+            !executionController.signal.aborted &&
+            !(error instanceof TimeoutError)
+          ) {
+            error = new TimeoutError(
+              `node "${nodeId}" execution timed out after ${control.nodeTimeoutMs}ms`,
+              control.nodeTimeoutMs,
+              'node',
+            );
+          }
+
+          if (executionController.signal.aborted && !(error instanceof CancelledError)) {
+            error = new CancelledError('Workflow execution was cancelled');
+          }
+
           const isTimeout = error instanceof TimeoutError;
           const isCancelled = error instanceof CancelledError;
 
@@ -289,7 +320,13 @@ export class WorkflowExecutorService {
 
     try {
       // 工作流整体超时控制
-      await withTimeout(runLoop(), control.workflowTimeoutMs, 'workflow', workflow.name);
+      await withTimeout(
+        runLoop(),
+        control.workflowTimeoutMs,
+        'workflow',
+        workflow.name,
+        () => executionController.abort(),
+      );
 
       await this.prisma.workflowExecution.update({
         where: { id: execId },
@@ -350,6 +387,7 @@ export class WorkflowExecutorService {
 
       throw error;
     } finally {
+      executionController.abort();
       heartbeat.stop();
       this.cancelTokens.delete(execId);
     }
@@ -365,6 +403,7 @@ export class WorkflowExecutorService {
     const token = this.cancelTokens.get(executionId);
     if (token) {
       token.cancelled = true;
+      token.controller.abort();
       this.logger.log(`Workflow execution ${executionId} marked for cancellation`);
       return true;
     }

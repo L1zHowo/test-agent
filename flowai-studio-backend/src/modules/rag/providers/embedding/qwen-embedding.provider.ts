@@ -38,20 +38,20 @@ export class QwenEmbeddingProvider implements EmbeddingProvider {
     };
   }
 
-  async embed(text: string): Promise<EmbeddingResult> {
+  async embed(text: string, signal?: AbortSignal): Promise<EmbeddingResult> {
     if (!this.config.apiKey || this.config.apiKey === 'your-qwen-api-key-here') {
       this.logger.warn('Qwen Embedding API key not configured');
       return { embedding: [], tokenUsage: 0 };
     }
 
-    const result = await this.callEmbeddingAPI([text]);
+    const result = await this.callEmbeddingAPI([text], signal);
     return {
       embedding: result.embeddings[0] ?? [],
       tokenUsage: result.totalTokens,
     };
   }
 
-  async embedBatch(texts: string[], concurrency?: number): Promise<BatchEmbeddingResult> {
+  async embedBatch(texts: string[], concurrency?: number, signal?: AbortSignal): Promise<BatchEmbeddingResult> {
     const maxConcurrency = concurrency ?? this.config.maxConcurrency ?? 5;
     const results: { content: string; embedding: number[]; tokenUsage?: number }[] = [];
     const failedIndices: number[] = [];
@@ -63,7 +63,7 @@ export class QwenEmbeddingProvider implements EmbeddingProvider {
       const batchResults = await Promise.allSettled(
         batch.map(async (chunk, batchIdx) => {
           const globalIdx = i + batchIdx;
-          const result = await this.embedWithRetry(chunk);
+          const result = await this.embedWithRetry(chunk, 0, signal);
           return { content: chunk, embedding: result.embedding, tokenUsage: result.tokenUsage, globalIdx };
         }),
       );
@@ -120,15 +120,15 @@ export class QwenEmbeddingProvider implements EmbeddingProvider {
   /**
    * 带重试的向量生成
    */
-  private async embedWithRetry(text: string, retries: number = 0): Promise<EmbeddingResult> {
+  private async embedWithRetry(text: string, retries: number = 0, signal?: AbortSignal): Promise<EmbeddingResult> {
     try {
-      return await this.embed(text);
+      return await this.embed(text, signal);
     } catch (error) {
       if (retries < (this.config.maxRetries ?? 2)) {
         this.logger.warn(`Embedding retry ${retries + 1}/${this.config.maxRetries} for text: "${text.substring(0, 50)}..."`);
         // 指数退避
         await this.sleep(Math.pow(2, retries) * 500);
-        return this.embedWithRetry(text, retries + 1);
+        return this.embedWithRetry(text, retries + 1, signal);
       }
       throw error;
     }
@@ -138,7 +138,7 @@ export class QwenEmbeddingProvider implements EmbeddingProvider {
    * 调用 Qwen Embedding API
    * 使用 OpenAI 兼容协议格式
    */
-  private async callEmbeddingAPI(texts: string[]): Promise<{ embeddings: number[][]; totalTokens: number }> {
+  private async callEmbeddingAPI(texts: string[], signal?: AbortSignal): Promise<{ embeddings: number[][]; totalTokens: number }> {
     const response = await axios.post(
       `${this.config.baseUrl}/embeddings`,
       {
@@ -152,6 +152,7 @@ export class QwenEmbeddingProvider implements EmbeddingProvider {
           'Authorization': `Bearer ${this.config.apiKey}`,
         },
         timeout: this.config.timeout,
+        signal,
       },
     );
 

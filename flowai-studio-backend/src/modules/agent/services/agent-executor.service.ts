@@ -204,6 +204,7 @@ export class AgentExecutorService {
         temperature: agentConfig.temperature,
         maxTokens: agentConfig.maxTokens,
         tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+        signal: options?.signal,
       });
 
       // 如果有工具调用 → 执行工具
@@ -747,6 +748,7 @@ export class AgentExecutorService {
         temperature: workerConfig.temperature,
         maxTokens: workerConfig.maxTokens,
         tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+        signal: options?.signal,
       });
 
       if (llmResponse.toolCalls && llmResponse.toolCalls.length > 0) {

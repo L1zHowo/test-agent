@@ -450,6 +450,7 @@ export class RAGService {
     retrievalModeOverride?: 'vector' | 'keyword' | 'hybrid',
     vectorWeightOverride?: number,
     rrfKOverride?: number,
+    signal?: AbortSignal,
   ): Promise<any[]> {
     // 1. 获取知识库配置
     const kb = await this.prisma.knowledgeBase.findUnique({ where: { id: knowledgeBaseId } });
@@ -480,11 +481,11 @@ export class RAGService {
         results = await this.retrieveKeyword(query, knowledgeBaseId, effectiveTopK, kb);
         break;
       case 'hybrid':
-        results = await this.retrieveHybrid(query, knowledgeBaseId, effectiveTopK, kb, vectorWeight, rrfK);
+        results = await this.retrieveHybrid(query, knowledgeBaseId, effectiveTopK, kb, vectorWeight, rrfK, signal);
         break;
       case 'vector':
       default:
-        results = await this.retrieveVector(query, knowledgeBaseId, effectiveTopK, kb);
+        results = await this.retrieveVector(query, knowledgeBaseId, effectiveTopK, kb, signal);
         break;
     }
 
@@ -499,12 +500,12 @@ export class RAGService {
   /**
    * 纯向量检索
    */
-  private async retrieveVector(query: string, knowledgeBaseId: string, topK: number, kb: any): Promise<any[]> {
+  private async retrieveVector(query: string, knowledgeBaseId: string, topK: number, kb: any, signal?: AbortSignal): Promise<any[]> {
     const embeddingProvider = this.getEmbeddingProviderForKB(kb);
     const vectorStore = this.getVectorStoreForKB(kb);
 
     // 生成查询向量
-    const embedResult = await embeddingProvider.embed(query);
+    const embedResult = await embeddingProvider.embed(query, signal);
     if (!embedResult.embedding || embedResult.embedding.length === 0) {
       this.logger.warn('Query embedding is empty, returning empty results');
       return [];
@@ -565,12 +566,13 @@ export class RAGService {
     kb: any,
     vectorWeight: number = 0.7,
     rrfK: number = 60,
+    signal?: AbortSignal,
   ): Promise<any[]> {
 
     // 并行执行双路检索
     const [vectorResults, keywordResults] = await Promise.allSettled([
       // 向量检索
-      this.retrieveVectorForHybrid(query, knowledgeBaseId, topK, kb),
+      this.retrieveVectorForHybrid(query, knowledgeBaseId, topK, kb, signal),
       // 关键词检索（多取一些，因为融合后可能部分重叠）
       this.retrieveKeywordForHybrid(query, knowledgeBaseId, topK * 2),
     ]);
@@ -655,11 +657,12 @@ export class RAGService {
     knowledgeBaseId: string,
     topK: number,
     kb: any,
+    signal?: AbortSignal,
   ): Promise<RetrievalResult[]> {
     const embeddingProvider = this.getEmbeddingProviderForKB(kb);
     const vectorStore = this.getVectorStoreForKB(kb);
 
-    const embedResult = await embeddingProvider.embed(query);
+    const embedResult = await embeddingProvider.embed(query, signal);
     if (!embedResult.embedding || embedResult.embedding.length === 0) {
       return [];
     }

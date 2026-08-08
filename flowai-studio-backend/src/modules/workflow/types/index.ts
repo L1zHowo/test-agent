@@ -2,6 +2,7 @@ import { Subject } from 'rxjs'
 
 export interface NodeExecutionOptions {
   sseSubject?: Subject<any>;
+  signal?: AbortSignal;
 }
 
 export interface INodeExecutor {

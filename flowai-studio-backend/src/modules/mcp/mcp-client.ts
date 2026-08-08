@@ -63,6 +63,8 @@ export class McpClient {
     resolve: (value: any) => void;
     reject: (reason: any) => void;
     timer: NodeJS.Timeout;
+    onAbort?: () => void;
+    cleanup?: () => void;
   }>();
   private buffer = '';
   private connected = false;
@@ -178,15 +180,15 @@ export class McpClient {
   /**
    * 调用工具
    */
-  async callTool(name: string, args: Record<string, any> = {}): Promise<McpToolResult> {
-    const result = await this.sendRequest('tools/call', { name, arguments: args });
+  async callTool(name: string, args: Record<string, any> = {}, signal?: AbortSignal): Promise<McpToolResult> {
+    const result = await this.sendRequest('tools/call', { name, arguments: args }, signal);
     return result as McpToolResult;
   }
 
   /**
    * 发送 JSON-RPC 请求
    */
-  private sendRequest(method: string, params: Record<string, any>): Promise<any> {
+  private sendRequest(method: string, params: Record<string, any>, signal?: AbortSignal): Promise<any> {
     return new Promise((resolve, reject) => {
       if (!this.process?.stdin?.writable) {
         return reject(new Error('MCP Server 未连接'));
@@ -201,11 +203,31 @@ export class McpClient {
       };
 
       const timer = setTimeout(() => {
+        const pending = this.pendingRequests.get(id);
+        pending?.cleanup?.();
         this.pendingRequests.delete(id);
         reject(new Error(`MCP 请求超时: ${method}`));
       }, 30000);
 
-      this.pendingRequests.set(id, { resolve, reject, timer });
+      const onAbort = () => {
+        const pending = this.pendingRequests.get(id);
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        this.pendingRequests.delete(id);
+        reject(new Error(`MCP 请求已取消: ${method}`));
+        this.sendNotification('notifications/cancelled', {
+          requestId: id,
+          reason: 'workflow execution cancelled',
+        });
+      };
+
+      const cleanup = () => signal?.removeEventListener('abort', onAbort);
+      this.pendingRequests.set(id, { resolve, reject, timer, onAbort, cleanup });
+      if (signal?.aborted) {
+        onAbort();
+        return;
+      }
+      signal?.addEventListener('abort', onAbort, { once: true });
 
       const message = JSON.stringify(request) + '\n';
       this.process.stdin.write(message);
@@ -264,6 +286,7 @@ export class McpClient {
     if (!pending) return;
 
     clearTimeout(pending.timer);
+    pending.cleanup?.();
     this.pendingRequests.delete(message.id);
 
     if (message.error) {

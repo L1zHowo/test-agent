@@ -209,6 +209,7 @@ export class McpService {
     serverId: string,
     toolName: string,
     args: Record<string, any> = {},
+    signal?: AbortSignal,
   ): Promise<McpToolResult> {
     await this.findOne(userId, serverId);
 
@@ -218,7 +219,7 @@ export class McpService {
     }
 
     try {
-      return await client.callTool(toolName, args);
+      return await client.callTool(toolName, args, signal);
     } catch (err) {
       throw new BadRequestException(
         `调用工具 "${toolName}" 失败: ${err instanceof Error ? err.message : err}`,
@@ -300,9 +301,10 @@ export class McpService {
     userId: string,
     toolId: string,
     args: Record<string, any> = {},
+    signal?: AbortSignal,
   ): Promise<McpToolResult> {
     const { serverId, toolName } = this.parseToolId(toolId);
-    return this.callTool(userId, serverId, toolName, args);
+    return this.callTool(userId, serverId, toolName, args, signal);
   }
 
   /**

@@ -265,4 +265,5 @@ export interface AgentRunOptions {
   sseSubject?: any;
   /** 最大迭代轮数覆盖 */
   maxIterations?: number;
+  signal?: AbortSignal;
 }

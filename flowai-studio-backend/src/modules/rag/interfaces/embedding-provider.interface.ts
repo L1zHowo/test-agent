@@ -79,7 +79,7 @@ export interface EmbeddingProvider {
    * @param text - 待向量化的文本
    * @returns 向量生成结果
    */
-  embed(text: string): Promise<EmbeddingResult>;
+  embed(text: string, signal?: AbortSignal): Promise<EmbeddingResult>;
 
   /**
    * 批量生成向量嵌入
@@ -89,7 +89,7 @@ export interface EmbeddingProvider {
    * @param concurrency - 并发数（默认 5）
    * @returns 批量向量生成结果
    */
-  embedBatch(texts: string[], concurrency?: number): Promise<BatchEmbeddingResult>;
+  embedBatch(texts: string[], concurrency?: number, signal?: AbortSignal): Promise<BatchEmbeddingResult>;
 
   /**
    * 获取当前 Provider 支持的向量维度

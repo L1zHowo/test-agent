@@ -20,6 +20,7 @@ import { RAGModule } from '../rag/rag.module';
 import { SkillModule } from '../skill/skill.module';
 import { AiModule } from '../ai/ai.module';
 import { AgentModule } from '../agent/agent.module';
+import { RateLimiterService } from '../../common/services/rate-limiter.service';
 
 @Module({
   imports: [PrismaModule, RAGModule, SkillModule, forwardRef(() => AiModule), AgentModule],
@@ -39,6 +40,7 @@ import { AgentModule } from '../agent/agent.module';
     ConditionNodeExecutor,
     OutputNodeExecutor,
     AgentNodeExecutor,
+    RateLimiterService,
   ],
   exports: [WorkflowExecutorService],
 })

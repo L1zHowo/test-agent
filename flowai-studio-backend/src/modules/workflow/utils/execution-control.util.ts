@@ -50,6 +50,7 @@ export async function withTimeout<T>(
   timeoutMs: number,
   scope: 'node' | 'workflow',
   label?: string,
+  onTimeout?: () => void,
 ): Promise<T> {
   if (!timeoutMs || timeoutMs <= 0) {
     return promise;
@@ -59,6 +60,7 @@ export async function withTimeout<T>(
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
+      onTimeout?.();
       const target = label ? `${scope} "${label}"` : scope;
       reject(
         new TimeoutError(
@@ -75,6 +77,24 @@ export async function withTimeout<T>(
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+/**
+ * 将多个取消信号合并成一个，兼容当前项目的 Node/TypeScript 版本。
+ */
+export function combineAbortSignals(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+
+  for (const signal of signals) {
+    if (signal.aborted) {
+      abort();
+      break;
+    }
+    signal.addEventListener('abort', abort, { once: true });
+  }
+
+  return controller.signal;
 }
 
 /** 重试选项 */

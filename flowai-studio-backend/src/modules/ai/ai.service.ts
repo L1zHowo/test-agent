@@ -251,6 +251,7 @@ export class AiService {
     model = 'qwen-turbo',
     temperature = 0.7,
     maxTokens = 2048,
+    signal?: AbortSignal,
   ): Promise<string> {
     const apiKey = this.configService.get<string>('QWEN_API_KEY');
     const baseUrl = this.configService.get<string>('QWEN_BASE_URL');
@@ -276,6 +277,7 @@ export class AiService {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
           },
+          signal,
         },
       );
       return response.data.choices[0].message.content;

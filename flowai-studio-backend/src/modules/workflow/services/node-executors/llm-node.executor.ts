@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { INodeExecutor } from '../../types';
+import { INodeExecutor, NodeExecutionOptions } from '../../types';
 import { AiService } from '../../../ai/ai.service';
 
 @Injectable()
@@ -8,7 +8,7 @@ export class LLMNodeExecutor implements INodeExecutor {
     private readonly aiService: AiService,
   ) {}
 
-  async execute(node: any, context: Record<string, any>): Promise<Record<string, any>> {
+  async execute(node: any, context: Record<string, any>, options?: NodeExecutionOptions): Promise<Record<string, any>> {
     const nodeData = node.data as any;
     const { model, systemPrompt, userPrompt, temperature, maxTokens } = nodeData;
 
@@ -22,6 +22,7 @@ export class LLMNodeExecutor implements INodeExecutor {
       model,
       temperature,
       maxTokens,
+      options?.signal,
     );
 
     return { result: content };
