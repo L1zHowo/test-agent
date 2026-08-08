@@ -105,7 +105,7 @@ const Layout: React.FC = () => {
             <div className="header-online-dot"><span className="online-dot" /><span className="online-text">在线</span></div>
             <Dropdown menu={{ items: userMenu, onClick: handleUserMenuClick }} trigger={['click']} placement="bottomRight">
               <div className="profile-chip">
-                <Avatar size={26} icon={<UserOutlined />} style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)', flexShrink: 0 }} />
+          <Avatar size={26} icon={<UserOutlined />} style={{ background: 'linear-gradient(135deg, #e58aa7, #f0a3bd)', flexShrink: 0 }} />
                 <div className="profile-copy"><span className="username">{user?.username || '用户'}</span></div>
                 <CaretDownOutlined className="profile-caret" />
               </div>

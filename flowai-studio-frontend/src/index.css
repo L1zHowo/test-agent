@@ -47,7 +47,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #c4b5fd;
+  background: #f3b3c7;
 }
 
 /* ============================================================
@@ -97,25 +97,25 @@ body {
 }
 
 .ant-btn-primary {
-  background: #7c3aed !important;
-  border-color: #7c3aed !important;
+  background: #e58aa7 !important;
+  border-color: #e58aa7 !important;
 }
 
 .ant-btn-primary:not(:disabled):hover {
-  background: #6d28d9 !important;
-  border-color: #6d28d9 !important;
+  background: #cf6f91 !important;
+  border-color: #cf6f91 !important;
 }
 
 /* Input */
 .ant-input:focus,
 .ant-input-affix-wrapper:focus,
 .ant-input-affix-wrapper-focused {
-  border-color: #7c3aed !important;
+  border-color: #e58aa7 !important;
   box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1) !important;
 }
 
 .ant-select-focused .ant-select-selector {
-  border-color: #7c3aed !important;
+  border-color: #e58aa7 !important;
   box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1) !important;
 }
 
@@ -135,7 +135,7 @@ body {
 }
 
 .react-flow__node.selected {
-  border-color: #7c3aed;
+  border-color: #e58aa7;
   box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15), 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
@@ -145,5 +145,5 @@ body {
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #7c3aed;
+  stroke: #e58aa7;
 }

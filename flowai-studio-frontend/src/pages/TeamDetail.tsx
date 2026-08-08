@@ -142,7 +142,7 @@ const TeamDetail: React.FC = () => {
       key: 'userId',
       render: (userId: string, record: TeamMember) => (
         <div className="member-user-cell">
-          <Avatar size={32} icon={<UserOutlined />} style={{ backgroundColor: '#7c3aed' }} />
+              <Avatar size={32} icon={<UserOutlined />} style={{ backgroundColor: '#e58aa7' }} />
           <span className="member-username">{record.user?.username || userId}</span>
         </div>
       ),
@@ -203,7 +203,7 @@ const TeamDetail: React.FC = () => {
       key: 'applicationId',
       render: (applicationId: string, record: TeamApplication) => (
         <div className="team-app-cell">
-          <AppstoreOutlined style={{ fontSize: 18, color: '#7c3aed' }} />
+              <AppstoreOutlined style={{ fontSize: 18, color: '#e58aa7' }} />
           <span className="team-app-name">
             {record.application?.name || applicationId}
           </span>
@@ -288,7 +288,7 @@ const TeamDetail: React.FC = () => {
           />
           <Avatar
             size={48}
-            style={{ backgroundColor: '#7c3aed' }}
+              style={{ backgroundColor: '#e58aa7' }}
             icon={<TeamOutlined />}
           >
             {currentTeam.name.charAt(0).toUpperCase()}

@@ -80,7 +80,7 @@ const SharedApp: React.FC = () => {
               <img src={appData.icon} alt="" style={{ width: 48, height: 48 }} />
             ) : (
               <div className="shared-app-icon-default">
-                <RadarChartOutlined style={{ fontSize: 32, color: '#7c3aed' }} />
+            <RadarChartOutlined style={{ fontSize: 32, color: '#e58aa7' }} />
               </div>
             )}
           </div>

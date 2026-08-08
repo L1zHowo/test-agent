@@ -14,7 +14,7 @@ interface BaseNodeProps {
   width?: number
 }
 
-const BaseNode = ({ id, label, icon, children, color = '#7c3aed', width = 220 }: BaseNodeProps) => {
+const BaseNode = ({ id, label, icon, children, color = '#e58aa7', width = 220 }: BaseNodeProps) => {
   const executionState = useStore((state) => state.executionStates[id])
   const status = executionState?.status || 'idle'
 

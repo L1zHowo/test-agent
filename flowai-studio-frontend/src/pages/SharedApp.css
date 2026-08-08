@@ -19,7 +19,7 @@
   align-items: center;
   gap: 10px;
   font-size: 20px;
-  color: #7c3aed;
+  color: #e58aa7;
 }
 
 .shared-app-logo-text {
@@ -58,7 +58,7 @@
   width: 64px;
   height: 64px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  background: linear-gradient(135deg, #e58aa7, #f0a3bd);
   display: flex;
   align-items: center;
   justify-content: center;

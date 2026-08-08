@@ -11,9 +11,9 @@
   --c-text-primary: #1c2433;
   --c-text-secondary: #6b7a99;
   --c-text-tertiary: #a0adc0;
-  --c-accent: #7c3aed;          /* purple — AiFlow primary */
-  --c-accent-light: #f3effe;
-  --c-accent-hover: #6d28d9;
+  --c-accent: #e58aa7;          /* light pink — AiFlow primary */
+  --c-accent-light: #fde8ef;
+  --c-accent-hover: #cf6f91;
   --c-green: #059669;
   --c-green-light: #ecfdf5;
   --c-blue: #2563eb;
@@ -82,7 +82,7 @@
   display: grid;
   place-items: center;
   color: #ffffff;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  background: linear-gradient(135deg, #e58aa7, #f0a3bd);
   font-size: 16px;
   flex-shrink: 0;
   box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
@@ -313,7 +313,7 @@
 
 .profile-chip:hover {
   background: var(--c-bg);
-  border-color: #c4b5fd;
+  border-color: #f3b3c7;
 }
 
 .profile-copy {
@@ -359,7 +359,7 @@
 }
 
 .content::-webkit-scrollbar-thumb:hover {
-  background: #c4b5fd;
+  background: #f3b3c7;
 }
 
 .content-container {
@@ -394,7 +394,7 @@
 }
 
 .content-container .ant-table-wrapper .ant-table-tbody > tr:hover > td {
-  background: #faf9ff !important;
+  background: #fff7fa !important;
 }
 
 .content-container .ant-input-affix-wrapper,

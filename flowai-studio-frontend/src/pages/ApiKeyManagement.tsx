@@ -93,7 +93,7 @@ const ApiKeyManagement: React.FC = () => {
       key: 'name',
       render: (name: string, record: ApiKey) => (
         <div className="apikey-name-cell">
-          <KeyOutlined style={{ color: record.isActive ? '#7c3aed' : '#8c8c8c' }} />
+              <KeyOutlined style={{ color: record.isActive ? '#e58aa7' : '#8c8c8c' }} />
           <div className="apikey-name-info">
             <span className="apikey-name-text">{name}</span>
             <span className="apikey-prefix">{record.keyPrefix}…</span>
@@ -109,7 +109,7 @@ const ApiKeyManagement: React.FC = () => {
       render: (scopes: string[]) => (
         <Space wrap size={[4, 4]}>
           {scopes?.map((scope) => (
-            <Tag key={scope} color="purple" style={{ fontSize: 11 }}>
+              <Tag key={scope} color="pink" style={{ fontSize: 11 }}>
               {API_KEY_SCOPE_OPTIONS.find((o) => o.value === scope)?.label || scope}
             </Tag>
           ))}

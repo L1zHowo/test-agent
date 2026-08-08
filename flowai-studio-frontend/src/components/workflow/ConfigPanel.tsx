@@ -21,7 +21,7 @@ const MODEL_GROUPS = [
     models: [
       { id: 'qwen-turbo', name: 'Qwen Turbo', tag: '快速', tagColor: 'green' },
       { id: 'qwen-plus', name: 'Qwen Plus', tag: '高质量', tagColor: 'blue' },
-      { id: 'qwen-max', name: 'Qwen Max', tag: '最强', tagColor: 'purple' },
+  { id: 'qwen-max', name: 'Qwen Max', tag: '最强', tagColor: 'pink' },
       { id: 'qwen-long', name: 'Qwen Long', tag: '长文本', tagColor: 'orange' },
     ],
   },
@@ -151,7 +151,7 @@ const ConfigPanel: React.FC = () => {
               <Space><Tag color="blue">单智能体</Tag><Text type="secondary" style={{ fontSize: 12 }}>一个 Agent 完成所有任务</Text></Space>
             </Option>
             <Option value="supervisor">
-              <Space><Tag color="purple">多智能体</Tag><Text type="secondary" style={{ fontSize: 12 }}>Supervisor 协调多个 Worker</Text></Space>
+        <Space><Tag color="pink">多智能体</Tag><Text type="secondary" style={{ fontSize: 12 }}>Supervisor 协调多个 Worker</Text></Space>
             </Option>
           </Select>
         </Form.Item>
@@ -203,7 +203,7 @@ const ConfigPanel: React.FC = () => {
                 <Option key={tool.id} value={tool.id}>
                   <Space>
                     <span>{tool.name}</span>
-                    {tool.serverName && <Tag color="purple">{tool.serverName}</Tag>}
+          {tool.serverName && <Tag color="pink">{tool.serverName}</Tag>}
                   </Space>
                 </Option>
               ))}
@@ -234,7 +234,7 @@ const ConfigPanel: React.FC = () => {
                 size="small"
                 title={
                   <Space>
-                    <Tag color="purple">Worker {index + 1}</Tag>
+          <Tag color="pink">Worker {index + 1}</Tag>
                     <Input value={worker.name} onChange={(e) => updateWorker(index, 'name', e.target.value)} placeholder="Worker 名称" style={{ width: 120 }} size="small" />
                   </Space>
                 }

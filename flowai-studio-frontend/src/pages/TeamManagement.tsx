@@ -83,7 +83,7 @@ const TeamManagement: React.FC = () => {
         <div className="team-name-cell" onClick={() => navigate(`/teams/${record.id}`)}>
           <Avatar
             size={36}
-            style={{ backgroundColor: '#7c3aed', flexShrink: 0 }}
+            style={{ backgroundColor: '#e58aa7', flexShrink: 0 }}
             icon={<TeamOutlined />}
           >
             {name.charAt(0).toUpperCase()}

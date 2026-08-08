@@ -193,7 +193,7 @@ const KnowledgeBase: React.FC = () => {
       title: '检索模式', dataIndex: 'retrievalMode', key: 'retrievalMode', width: 110,
       render: (mode: string) => {
         const opt = RETRIEVAL_MODE_OPTIONS.find((o) => o.value === mode) || RETRIEVAL_MODE_OPTIONS[0]
-        return <Tag color={opt.color === '#1677ff' ? 'blue' : opt.color === '#52c41a' ? 'green' : 'purple'} style={{ margin: 0 }}>{opt.label}</Tag>
+  return <Tag color={opt.color === '#1677ff' ? 'blue' : opt.color === '#52c41a' ? 'green' : 'pink'} style={{ margin: 0 }}>{opt.label}</Tag>
       },
     },
     {

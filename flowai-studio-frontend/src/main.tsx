@@ -11,8 +11,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       locale={zhCN}
       theme={{
         token: {
-          colorPrimary: '#7c3aed',
-          colorLink: '#7c3aed',
+          colorPrimary: '#db4c7b',
+          colorLink: '#db4c7b',
           colorSuccess: '#059669',
           colorWarning: '#d97706',
           colorError: '#dc2626',
@@ -54,11 +54,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           },
           Menu: {
             itemBorderRadius: 8,
-            itemSelectedBg: '#f3effe',
-            itemSelectedColor: '#7c3aed',
+          itemSelectedBg: '#fde8ef',
+          itemSelectedColor: '#e58aa7',
             itemHoverBg: '#f7f8fa',
             itemHoverColor: '#1c2433',
-            itemActiveBg: '#f3effe',
+          itemActiveBg: '#fde8ef',
           },
           Modal: {
             borderRadius: 20,

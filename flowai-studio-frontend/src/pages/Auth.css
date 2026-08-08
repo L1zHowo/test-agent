@@ -18,7 +18,7 @@
   justify-content: center;
   align-items: center;
   padding: 48px;
-  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 50%, #4c1d95 100%);
+  background: linear-gradient(135deg, #e58aa7 0%, #cf6f91 50%, #b84f73 100%);
   color: #fff;
   position: relative;
   overflow: hidden;
@@ -155,7 +155,7 @@
 }
 
 .auth-switch a {
-  color: #7c3aed;
+  color: #e58aa7;
   font-weight: 600;
 }
 
