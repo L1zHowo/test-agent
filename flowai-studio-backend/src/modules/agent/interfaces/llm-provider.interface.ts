@@ -44,10 +44,6 @@ export interface LLMModelInfo {
   provider: LLMProviderType;
   /** 模型能力 */
   capabilities: LLMModelCapabilities;
-  /** 输入价格 (USD per 1M tokens) */
-  inputPricePer1M?: number;
-  /** 输出价格 (USD per 1M tokens) */
-  outputPricePer1M?: number;
   /** 是否为默认模型 */
   isDefault?: boolean;
   /** 排序权重 */

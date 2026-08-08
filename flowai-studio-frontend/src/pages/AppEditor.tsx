@@ -37,6 +37,7 @@ const AppEditor: React.FC = () => {
     createWorkflow,
     nodes,
     edges,
+    isDirty,
     isLoading,
     saveWorkflow,
     executionStatus,
@@ -73,6 +74,22 @@ const AppEditor: React.FC = () => {
     }
     initEditor()
   }, [appId])
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirty) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isDirty])
+
+  const handleBack = () => {
+    if (isDirty && !window.confirm('工作流有未保存的修改，确定要离开吗？')) return
+    navigate('/apps')
+  }
 
   const handleSave = async () => {
     const workflowId = currentWorkflow?.id
@@ -135,7 +152,7 @@ const AppEditor: React.FC = () => {
       <header className="editor-topbar">
         <div className="editor-topbar-left">
           <Tooltip title="返回应用列表">
-            <button className="editor-back-btn" onClick={() => navigate('/apps')}>
+            <button className="editor-back-btn" onClick={handleBack}>
               <ArrowLeftOutlined />
             </button>
           </Tooltip>
@@ -145,6 +162,7 @@ const AppEditor: React.FC = () => {
               <AppstoreOutlined />
             </span>
             <span className="editor-app-name">{currentApp?.name || '应用编辑器'}</span>
+            {isDirty && <Tag color="warning">未保存</Tag>}
             {tag && <Tag color={tag.color}>{tag.label}</Tag>}
           </div>
         </div>

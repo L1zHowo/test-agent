@@ -32,6 +32,11 @@ import {
   VectorSearchFilter,
   VectorStoreStats,
 } from '../../interfaces/vector-store.interface';
+import {
+  metadataInCondition,
+  metadataMatchCondition,
+  metadataRangeConditions,
+} from '../../utils/metadata-sql.util';
 
 @Injectable()
 export class PgVectorStore implements VectorStore {
@@ -275,27 +280,17 @@ export class PgVectorStore implements VectorStore {
 
     if (filter.match) {
       const { key, value } = filter.match;
-      if (typeof value === 'string') {
-        parts.push(`(metadata::jsonb)->>'${key}' = '${value.replace(/'/g, "''")}'`);
-      } else {
-        parts.push(`(metadata::jsonb)->>'${key}' = '${value}'`);
-      }
+      parts.push(metadataMatchCondition(key, value));
     }
 
     if (filter.range) {
       const { key, gte, lte } = filter.range;
-      if (gte !== undefined) {
-        parts.push(`((metadata::jsonb)->>'${key}')::numeric >= ${gte}`);
-      }
-      if (lte !== undefined) {
-        parts.push(`((metadata::jsonb)->>'${key}')::numeric <= ${lte}`);
-      }
+      parts.push(...metadataRangeConditions(key, { gte, lte }));
     }
 
     if (filter.in) {
       const { key, values } = filter.in;
-      const valueList = values.map((v: any) => `'${String(v).replace(/'/g, "''")}'`).join(',');
-      parts.push(`(metadata::jsonb)->>'${key}' IN (${valueList})`);
+      parts.push(metadataInCondition(key, values));
     }
 
     return parts.join(' AND ');

@@ -31,7 +31,7 @@ import * as yaml from 'js-yaml';
  * 竞品对标:
  * - Dify: YAML DSL (v0.6+)，支持 workflow/app 类型
  * - n8n: JSON 导出/导入，节点类型版本校验
- * - Coze: JSON 格式，支持模板市场一键导入
+ * - Coze: JSON 格式
  */
 @Injectable()
 export class WorkflowDslService {

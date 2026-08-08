@@ -28,7 +28,7 @@ const { Search } = Input
 const AppList: React.FC = () => {
   const navigate = useNavigate()
   const {
-    apps, isLoading, fetchApps, createApp, updateApp, deleteApp, publishApp, unpublishApp,
+    apps, isLoading, fetchApps, createApp, updateApp, deleteApp,
     archiveApp, unarchiveApp,
     createWorkflow,
   } = useStore()
@@ -211,19 +211,6 @@ const AppList: React.FC = () => {
       case 'draft':
         return [
           {
-            key: 'publish',
-            label: '发布',
-            onClick: async (e: any) => {
-              e?.domEvent?.stopPropagation?.()
-              try {
-                await publishApp(app.id)
-                message.success('应用发布成功')
-              } catch {
-                message.error('发布失败')
-              }
-            },
-          },
-          {
             key: 'archive',
             label: '归档',
             icon: <InboxOutlined />,
@@ -240,19 +227,6 @@ const AppList: React.FC = () => {
         ]
       case 'published':
         return [
-          {
-            key: 'unpublish',
-            label: '下线',
-            onClick: async (e: any) => {
-              e?.domEvent?.stopPropagation?.()
-              try {
-                await unpublishApp(app.id)
-                message.success('应用已下线')
-              } catch {
-                message.error('下线失败')
-              }
-            },
-          },
           {
             key: 'archive',
             label: '归档',

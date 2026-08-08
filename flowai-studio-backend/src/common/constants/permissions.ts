@@ -2,7 +2,7 @@
  * RBAC 权限常量定义
  *
  * 权限格式: resource:action
- * - resource: 操作的资源类型 (app, workflow, knowledge-base, skill, team, api-key, template)
+ * - resource: 操作的资源类型 (app, workflow, knowledge-base, skill, team, api-key)
  * - action: 操作类型 (create, read, update, delete, execute, publish, share, manage)
  */
 
@@ -50,12 +50,6 @@ export const PERMISSIONS = {
   API_KEY_READ: 'api-key:read',
   API_KEY_DELETE: 'api-key:delete',
 
-  // 模板权限
-  TEMPLATE_CREATE: 'template:create',
-  TEMPLATE_READ: 'template:read',
-  TEMPLATE_UPDATE: 'template:update',
-  TEMPLATE_DELETE: 'template:delete',
-  TEMPLATE_PUBLISH: 'template:publish',
 } as const;
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];
@@ -94,9 +88,6 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS.SKILL_CREATE,
     PERMISSIONS.SKILL_READ,
     PERMISSIONS.SKILL_UPDATE,
-    PERMISSIONS.TEMPLATE_CREATE,
-    PERMISSIONS.TEMPLATE_READ,
-    PERMISSIONS.TEMPLATE_UPDATE,
     PERMISSIONS.API_KEY_READ,
   ],
   [ROLES.VIEWER]: [
@@ -104,7 +95,6 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS.WORKFLOW_READ,
     PERMISSIONS.KB_READ,
     PERMISSIONS.SKILL_READ,
-    PERMISSIONS.TEMPLATE_READ,
     PERMISSIONS.API_KEY_READ,
   ],
 };

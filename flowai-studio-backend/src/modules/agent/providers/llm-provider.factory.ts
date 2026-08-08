@@ -97,18 +97,6 @@ export class LLMProviderFactory {
     }
   }
 
-  estimateCost(modelId: string, promptTokens: number, completionTokens: number): number {
-    const modelInfo = this.getModelInfo(modelId);
-    if (!modelInfo?.inputPricePer1M || !modelInfo?.outputPricePer1M) {
-      return 0;
-    }
-
-    return (
-      (promptTokens / 1_000_000) * modelInfo.inputPricePer1M
-      + (completionTokens / 1_000_000) * modelInfo.outputPricePer1M
-    );
-  }
-
   clearCache(): void {
     this.instance = undefined;
   }

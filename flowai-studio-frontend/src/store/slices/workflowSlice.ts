@@ -25,6 +25,7 @@ export interface WorkflowSlice {
   agentEvents: AgentStreamEvent[]
   executionStatus: WorkflowExecutionStatus | null
   activeExecutionId: string | null
+  isDirty: boolean
   isLoading: boolean
   
   // Actions
@@ -64,37 +65,41 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
   agentEvents: [],
   executionStatus: null,
   activeExecutionId: null,
+  isDirty: false,
   isLoading: false,
 
   setWorkflows: (workflows) => set({ workflows }),
   
   setCurrentWorkflow: (workflow) => {
     if (workflow) {
-      set({ currentWorkflow: workflow, nodes: workflow.nodes, edges: workflow.edges })
+      set({ currentWorkflow: workflow, nodes: workflow.nodes, edges: workflow.edges, isDirty: false })
     } else {
-      set({ currentWorkflow: null, nodes: [], edges: [] })
+      set({ currentWorkflow: null, nodes: [], edges: [], isDirty: false })
     }
   },
   
-  setNodes: (nodes) => set({ nodes }),
+  setNodes: (nodes) => set({ nodes, isDirty: true }),
   
-  setEdges: (edges) => set({ edges }),
+  setEdges: (edges) => set({ edges, isDirty: true }),
 
   onNodesChange: (changes) => {
     set({
       nodes: applyNodeChanges(changes, get().nodes),
+      isDirty: get().isDirty || changes.some((change) => change.type !== 'select'),
     })
   },
 
   onEdgesChange: (changes) => {
     set({
       edges: applyEdgeChanges(changes, get().edges),
+      isDirty: changes.length > 0,
     })
   },
 
   onConnect: (connection) => {
     set({
       edges: addEdge(connection, get().edges),
+      isDirty: true,
     })
   },
   
@@ -108,7 +113,8 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
       // 如果当前选中的是这个节点，同步更新选中的节点数据
       selectedNode: state.selectedNode?.id === nodeId 
         ? { ...state.selectedNode, data: { ...state.selectedNode.data, ...data } }
-        : state.selectedNode
+        : state.selectedNode,
+      isDirty: true,
     }));
   },
   
@@ -245,7 +251,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     try {
       const response = await request.get(`/workflows/${id}`) as any
       const workflow = response.data as Workflow
-      set({ currentWorkflow: workflow, nodes: workflow.nodes || [], edges: workflow.edges || [], isLoading: false })
+      set({ currentWorkflow: workflow, nodes: workflow.nodes || [], edges: workflow.edges || [], isDirty: false, isLoading: false })
       return workflow
     } catch (error) {
       set({ isLoading: false })
@@ -292,7 +298,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     try {
       const response = await request.patch(`/workflows/${id}`, data) as any
       const updatedWorkflow = response.data as Workflow
-      set({ currentWorkflow: updatedWorkflow, isLoading: false })
+      set({ currentWorkflow: updatedWorkflow, isDirty: false, isLoading: false })
       return updatedWorkflow
     } catch (error) {
       set({ isLoading: false })

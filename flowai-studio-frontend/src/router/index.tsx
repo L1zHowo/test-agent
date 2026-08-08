@@ -7,13 +7,11 @@ import AppEditor from '../pages/AppEditor'
 import KnowledgeBase from '../pages/KnowledgeBase'
 import Skill from '../pages/Skill'
 import McpManager from '../pages/McpManager'
-import TemplateMarket from '../pages/TemplateMarket'
 import Debug from '../pages/Debug'
 import TeamManagement from '../pages/TeamManagement'
 import TeamDetail from '../pages/TeamDetail'
 import ApiKeyManagement from '../pages/ApiKeyManagement'
 import SharedApp from '../pages/SharedApp'
-import CostStatistics from '../pages/CostStatistics'
 import { useStore } from '../store'
 
 // 鉴权守卫
@@ -44,12 +42,10 @@ export const router = createBrowserRouter(
         <Route path="/knowledge-bases" element={<KnowledgeBase />} />
         <Route path="/tools" element={<Skill />} />
         <Route path="/mcp" element={<McpManager />} />
-        <Route path="/templates" element={<TemplateMarket />} />
         <Route path="/debug" element={<Debug />} />
         <Route path="/teams" element={<TeamManagement />} />
         <Route path="/teams/:teamId" element={<TeamDetail />} />
         <Route path="/api-keys" element={<ApiKeyManagement />} />
-        <Route path="/cost-statistics" element={<CostStatistics />} />
       </Route>
       
       {/* 404路由 */}

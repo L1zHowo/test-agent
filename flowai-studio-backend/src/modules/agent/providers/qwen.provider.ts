@@ -28,8 +28,6 @@ const QWEN_MODELS: LLMModelInfo[] = [
     displayName: 'Qwen Turbo (快速)',
     provider: 'qwen',
     capabilities: { functionCalling: true, vision: false, streaming: true, jsonMode: true, maxContextTokens: 131072, maxOutputTokens: 8192 },
-    inputPricePer1M: 0.3,
-    outputPricePer1M: 0.6,
     isDefault: true,
     order: 1,
   },
@@ -38,8 +36,6 @@ const QWEN_MODELS: LLMModelInfo[] = [
     displayName: 'Qwen Plus (高质量)',
     provider: 'qwen',
     capabilities: { functionCalling: true, vision: false, streaming: true, jsonMode: true, maxContextTokens: 131072, maxOutputTokens: 8192 },
-    inputPricePer1M: 0.8,
-    outputPricePer1M: 2,
     order: 2,
   },
   {
@@ -47,8 +43,6 @@ const QWEN_MODELS: LLMModelInfo[] = [
     displayName: 'Qwen Max (最强)',
     provider: 'qwen',
     capabilities: { functionCalling: true, vision: false, streaming: true, jsonMode: true, maxContextTokens: 32768, maxOutputTokens: 8192 },
-    inputPricePer1M: 2.4,
-    outputPricePer1M: 9.6,
     order: 3,
   },
   {
@@ -56,8 +50,6 @@ const QWEN_MODELS: LLMModelInfo[] = [
     displayName: 'Qwen Long (长文本)',
     provider: 'qwen',
     capabilities: { functionCalling: false, vision: false, streaming: true, jsonMode: false, maxContextTokens: 1048576, maxOutputTokens: 6000 },
-    inputPricePer1M: 0.5,
-    outputPricePer1M: 2,
     order: 4,
   },
   {
@@ -65,8 +57,6 @@ const QWEN_MODELS: LLMModelInfo[] = [
     displayName: 'Qwen VL Plus (视觉)',
     provider: 'qwen',
     capabilities: { functionCalling: false, vision: true, streaming: true, jsonMode: false, maxContextTokens: 32768, maxOutputTokens: 8192 },
-    inputPricePer1M: 1.2,
-    outputPricePer1M: 1.2,
     order: 5,
   },
 ];

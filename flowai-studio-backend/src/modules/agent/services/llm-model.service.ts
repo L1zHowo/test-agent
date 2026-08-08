@@ -39,21 +39,4 @@ export class LLMModelService {
     return this.providerFactory.healthCheckAll();
   }
 
-  estimateCost(modelId: string, promptTokens: number, completionTokens: number): {
-    modelId: string;
-    promptTokens: number;
-    completionTokens: number;
-    costUSD: number;
-  } {
-    return {
-      modelId,
-      promptTokens,
-      completionTokens,
-      costUSD: this.providerFactory.estimateCost(
-        modelId,
-        promptTokens,
-        completionTokens,
-      ),
-    };
-  }
 }

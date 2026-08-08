@@ -52,10 +52,8 @@ describe('LLMProviderFactory', () => {
     expect(Object.keys(groups)).toEqual(['qwen']);
   });
 
-  it('returns model information and estimates cost', () => {
+  it('returns model information', () => {
     expect(factory.getModelInfo('qwen-turbo')?.provider).toBe('qwen');
-    expect(factory.estimateCost('qwen-turbo', 1000, 500)).toBeGreaterThanOrEqual(0);
-    expect(factory.estimateCost('unsupported-model', 1000, 500)).toBe(0);
   });
 
   it('clears the cached instance', () => {

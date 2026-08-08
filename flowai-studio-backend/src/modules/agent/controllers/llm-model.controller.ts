@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { LLMModelService } from '../services/llm-model.service';
 
 @Controller('llm')
@@ -25,16 +25,4 @@ export class LLMModelController {
     return this.llmModelService.healthCheck();
   }
 
-  @Get('cost')
-  estimateCost(
-    @Query('modelId') modelId: string,
-    @Query('promptTokens') promptTokens: string,
-    @Query('completionTokens') completionTokens: string,
-  ) {
-    return this.llmModelService.estimateCost(
-      modelId,
-      parseInt(promptTokens, 10) || 0,
-      parseInt(completionTokens, 10) || 0,
-    );
-  }
 }
