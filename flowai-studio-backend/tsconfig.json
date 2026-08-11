@@ -9,8 +9,10 @@
     "target": "ES2021",
     "types": ["node", "jest"],
     "sourceMap": true,
+    "rootDir": "./src",
     "outDir": "./dist",
     "incremental": true,
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
     "skipLibCheck": true,
     "strictNullChecks": true,
     "noImplicitAny": true,
@@ -21,7 +23,10 @@
       "@/*": ["./src/*"],
       "@common/*": ["./src/common/*"],
       "@modules/*": ["./src/modules/*"],
-      "@config/*": ["./src/config/*"]
+      "@config/*": ["./src/config/*"],
+      "@flowai/shared-contracts": ["../packages/shared-contracts/src/index.d.ts"]
     }
-  }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "prisma"]
 }

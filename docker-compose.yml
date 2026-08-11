@@ -71,8 +71,8 @@ services:
   # ============================================================
   backend:
     build:
-      context: ./flowai-studio-backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: flowai-studio-backend/Dockerfile
     container_name: flowai-backend
     restart: unless-stopped
     environment:
@@ -103,8 +103,8 @@ services:
   # ============================================================
   frontend:
     build:
-      context: ./flowai-studio-frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: flowai-studio-frontend/Dockerfile
     container_name: flowai-frontend
     restart: unless-stopped
     ports:

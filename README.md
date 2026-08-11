@@ -8,12 +8,11 @@ FlowAI Studio 是一个可视化 AI 应用与工作流编排平台，包含前�
 
 ### 应用与工作流
 
-- 创建、编辑、发布、取消发布、归档和恢复应用。
+- 创建、编辑、归档和恢复应用。
 - 使用 React Flow 拖拽编排工作流。
 - 支持开始、用户输入、LLM、Agent、RAG、工具、条件分支和输出节点。
 - 支持普通执行和 SSE 流式执行。
 - 执行器包含超时、重试、心跳、取消运行和错误处理。
-- 支持工作流版本比较与回滚、DSL 导入导出与校验、工作流模板。
 
 ### 大模型与 Agent
 
@@ -61,6 +60,8 @@ MCP Server 由后端作为子进程运行。使用 Docker 时，对应命令和�
 | 部署   | Docker Compose、Nginx                                   |
 
 
+
+
 ## 项目结构
 
 ```text
@@ -70,8 +71,10 @@ MCP Server 由后端作为子进程运行。使用 Docker 时，对应命令和�
 |-- flowai-studio-backend/
 |   |-- prisma/              # Schema、迁移和 Seed
 |   `-- src/                 # User、App、Workflow、Agent、RAG、Skill、MCP、Team
-`-- flowai-studio-frontend/
-    `-- src/                 # 页面、组件、路由、状态和 API 封装
+|-- flowai-studio-frontend/
+|   `-- src/                 # 页面、组件、路由、状态和 API 封装
+`-- packages/
+    `-- shared-contracts/    # 前后端共享的工作流类型契约
 ```
 
 
@@ -114,6 +117,20 @@ MAX_FILE_SIZE=10485760
 不要提交真实的 `.env`、JWT Secret 或 API Key。根目录 `.gitignore` 已忽略所有 `.env` 文件。
 
 ## 本地开发启动
+
+根目录提供 npm workspace 入口，前后端目录结构和独立启动方式保持不变。已分别安装依赖时，可在根目录运行：
+
+```powershell
+npm run dev:backend
+npm run dev:frontend
+npm run build
+npm test
+npm run docker:build:backend
+npm run docker:build:frontend
+```
+
+PowerShell 阻止 `npm.ps1` 时，将上述命令中的 `npm` 替换为 `npm.cmd`。
+共享包位于仓库根目录，因此单独构建某个镜像时也必须使用仓库根目录作为 Docker context；上述两个脚本已封装正确命令。
 
 推荐用 Docker 运行 PostgreSQL 和 Redis，在本机运行前后端。
 

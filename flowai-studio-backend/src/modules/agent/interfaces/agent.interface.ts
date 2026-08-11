@@ -11,40 +11,24 @@
  * - 支持多轮对话和记忆
  */
 
+import type {
+  AgentMode,
+  AgentStrategy,
+  WorkerConfig,
+} from '@flowai/shared-contracts';
 
 // ============================================================
 // Agent 配置
 // ============================================================
 
 /** Agent 模式 */
-export type AgentMode = 'single' | 'supervisor' | 'swarm';
+export type { AgentMode } from '@flowai/shared-contracts';
 
 /** Agent 执行策略 */
-export type AgentStrategy = 'react' | 'plan-and-execute' | 'reflection';
+export type { AgentStrategy } from '@flowai/shared-contracts';
 
 /** 单个 Worker Agent 配置 */
-export interface WorkerAgentConfig {
-  /** Agent 唯一标识 */
-  id: string;
-  /** Agent 名称 */
-  name: string;
-  /** Agent 角色描述 */
-  description: string;
-  /** 系统提示词 */
-  systemPrompt: string;
-  /** 使用的 LLM 模型 */
-  model: string;
-  /** 温度参数 */
-  temperature: number;
-  /** 最大 token 数 */
-  maxTokens: number;
-  /** 可使用的工具 ID 列表 */
-  toolIds: string[];
-  /** 可使用的知识库 ID 列表 */
-  knowledgeBaseIds: string[];
-  /** 是否启用 RAG */
-  ragEnabled: boolean;
-}
+export type WorkerAgentConfig = WorkerConfig;
 
 /** Supervisor Agent 配置 */
 export interface SupervisorAgentConfig {

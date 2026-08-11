@@ -15,14 +15,20 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# 先复制依赖文件（利用 Docker 缓存层）
-COPY package*.json ./
+# 复制 workspace 清单（利用 Docker 缓存层）
+COPY package.json package-lock.json ./
+COPY flowai-studio-backend/package.json ./flowai-studio-backend/package.json
+COPY flowai-studio-frontend/package.json ./flowai-studio-frontend/package.json
+COPY packages/shared-contracts/package.json ./packages/shared-contracts/package.json
 
-# 安装依赖
-RUN npm ci
+# 只安装前端及其 workspace 依赖
+RUN npm ci --workspace=flowai-studio-frontend --include-workspace-root
 
 # 复制源代码
-COPY . .
+COPY flowai-studio-frontend/ ./flowai-studio-frontend/
+COPY packages/shared-contracts/ ./packages/shared-contracts/
+
+WORKDIR /app/flowai-studio-frontend
 
 # 构建生产版本
 RUN npm run build
@@ -31,10 +37,10 @@ RUN npm run build
 FROM nginx:alpine AS runner
 
 # 复制自定义 Nginx 配置
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY flowai-studio-frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # 从 builder 复制构建产物
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/flowai-studio-frontend/dist /usr/share/nginx/html
 
 # 暴露端口
 EXPOSE 80

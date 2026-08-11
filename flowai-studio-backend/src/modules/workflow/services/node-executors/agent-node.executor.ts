@@ -16,17 +16,21 @@ import {
   AgentNodeConfig,
   AgentRunOptions,
 } from '../../../agent/interfaces/agent.interface';
+import type {
+  AgentNodeData,
+  WorkerConfig,
+} from '@flowai/shared-contracts';
 
 @Injectable()
 export class AgentNodeExecutor implements INodeExecutor {
   constructor(private readonly agentExecutor: AgentExecutorService) {}
 
   async execute(
-    node: any,
+    node: { data: AgentNodeData },
     context: Record<string, any>,
     options?: NodeExecutionOptions,
   ): Promise<Record<string, any>> {
-    const nodeData = node.data as any;
+    const nodeData = node.data;
     const config = this.buildAgentConfig(nodeData);
     const input = this.resolveInput(nodeData.userPrompt, context);
 
@@ -63,7 +67,7 @@ export class AgentNodeExecutor implements INodeExecutor {
   /**
    * 从节点数据构建 AgentNodeConfig
    */
-  private buildAgentConfig(data: any): AgentNodeConfig {
+  private buildAgentConfig(data: AgentNodeData): AgentNodeConfig {
     const mode = data.agentMode || 'single';
     const maxIterations = data.maxIterations || 10;
     const strategy = data.strategy || 'react';
@@ -90,11 +94,11 @@ export class AgentNodeExecutor implements INodeExecutor {
         ragEnabled: data.ragEnabled ?? false,
       };
     } else if (mode === 'supervisor') {
-      const workers: any[] = data.workers || [];
+      const workers: WorkerConfig[] = data.workers || [];
 
       config.supervisor = {
         systemPrompt: data.supervisorPrompt || '',
-        model: data.model || 'qwen-plus',
+        model: data.supervisorModel || data.model || 'qwen-plus',
         temperature: data.temperature ?? 0.3,
         maxIterations,
         workers: workers.map((w, i) => ({

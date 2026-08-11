@@ -22,7 +22,8 @@
       "@store/*": ["./src/store/*"],
       "@hooks/*": ["./src/hooks/*"],
       "@utils/*": ["./src/utils/*"],
-      "@types/*": ["./src/types/*"]
+      "@types/*": ["./src/types/*"],
+      "@flowai/shared-contracts": ["../packages/shared-contracts/src/index.d.ts"]
     }
   },
   "include": ["src"],

@@ -18,6 +18,7 @@ yarn-error.log*
 **/.vite/
 **/.next/
 **/coverage/
+**/*.tsbuildinfo
 
 # Env files / secrets
 **/.env

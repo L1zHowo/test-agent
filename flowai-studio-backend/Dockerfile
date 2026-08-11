@@ -15,15 +15,20 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# 先复制依赖文件（利用 Docker 缓存层）
-COPY package*.json ./
-COPY prisma ./prisma/
+# 复制 workspace 清单（利用 Docker 缓存层）
+COPY package.json package-lock.json ./
+COPY flowai-studio-backend/package.json ./flowai-studio-backend/package.json
+COPY flowai-studio-frontend/package.json ./flowai-studio-frontend/package.json
+COPY packages/shared-contracts/package.json ./packages/shared-contracts/package.json
 
-# 安装所有依赖（包括 devDependencies）
-RUN npm ci
+# 只安装后端及其 workspace 依赖
+RUN npm ci --workspace=flowai-studio-backend --include-workspace-root
 
 # 复制源代码
-COPY . .
+COPY flowai-studio-backend/ ./flowai-studio-backend/
+COPY packages/shared-contracts/ ./packages/shared-contracts/
+
+WORKDIR /app/flowai-studio-backend
 
 # 生成 Prisma Client
 RUN npx prisma generate
@@ -32,7 +37,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # 移除 devDependencies
-RUN npm prune --production
+RUN npm prune --omit=dev --workspace=flowai-studio-backend
 
 # Stage 2: Runner
 FROM node:20-alpine AS runner
@@ -47,10 +52,10 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S nestjs -u 1001
 
 # 从 builder 复制必要文件
-COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
-COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nestjs:nodejs /app/flowai-studio-backend/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/flowai-studio-backend/node_modules ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/flowai-studio-backend/package.json ./
+COPY --from=builder --chown=nestjs:nodejs /app/flowai-studio-backend/prisma ./prisma
 
 # 创建上传目录
 RUN mkdir -p /app/uploads && chown nestjs:nodejs /app/uploads

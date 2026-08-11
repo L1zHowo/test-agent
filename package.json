@@ -1,0 +1,25 @@
+{
+  "name": "flowai-studio",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "flowai-studio-backend",
+    "flowai-studio-frontend",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run start:dev --workspace=flowai-studio-backend",
+    "dev:frontend": "npm run dev --workspace=flowai-studio-frontend",
+    "build": "npm run build --workspaces --if-present",
+    "build:backend": "npm run build --workspace=flowai-studio-backend",
+    "build:frontend": "npm run build --workspace=flowai-studio-frontend",
+    "docker:build:backend": "docker build -f flowai-studio-backend/Dockerfile -t flowai-backend .",
+    "docker:build:frontend": "docker build -f flowai-studio-frontend/Dockerfile -t flowai-frontend .",
+    "test": "npm run test --workspace=flowai-studio-backend",
+    "lint:frontend": "npm run lint --workspace=flowai-studio-frontend"
+  },
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9"
+  }
+}
